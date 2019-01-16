@@ -14,8 +14,8 @@ resources:
     cpu: 2000m
     memory: 2048Mi
 
-serviceAccount: 
+serviceAccount: xqueuejob-controller
 
 nodeSelector: 
- hostname: 
+ hostname:
 

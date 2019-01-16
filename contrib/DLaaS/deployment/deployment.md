@@ -8,8 +8,6 @@ Installation:
 ### 1. Download the github project.
 ```
 git clone git@github.com:dmatch01/kube-arbitrator.git
-cd kube-batch
-git xqueuejob_contrib_helm_fix 
 ```
 ### 2. Navigate to the Helm deployment directory.
 ```
@@ -19,4 +17,8 @@ cd contrib/DLaaS/deployment
 
 ```
 helm install kube-arbitrator --namespace kube-system
+```
+NOTE: You can adjust the cpu and memory demands of the deployment with command line overrides.  For example:
+```
+helm install kube-arbitrator --namespace kube-system --set resources.requests.cpu=1000m --set resources.requests.memory=1024Mi --set resources.limits.cpu=1000m --set resources.limits.memory=1024Mi
 ```
