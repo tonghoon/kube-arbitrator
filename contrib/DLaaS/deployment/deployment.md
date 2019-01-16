@@ -11,6 +11,8 @@ git clone git@github.com:dmatch01/kube-arbitrator.git
 ```
 ### 2. Navigate to the Helm deployment directory.
 ```
+cd kube-arbitrator
+git checkout xqueuejob_contrib_helm_fix
 cd contrib/DLaaS/deployment
 ```
 ### 3. Run the installation Helm chart.
