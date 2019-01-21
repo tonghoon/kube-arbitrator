@@ -11,7 +11,7 @@ To run `xqueuejob-controller`, a Kubernetes cluster must start up. Here is a doc
 
 #### Deploy `kube-batch` by Helm
 
-Follow these [instructions](contrib/DLaaS/doc/usage/tutorial.md) to install the `xqueuejob-controller` as a custom resource definition using Helm.
+Follow these [instructions](../../deployment/deployment.md) to install the `xqueuejob-controller` as a custom resource definition using Helm.
 
 ### (3) Create a Job
 

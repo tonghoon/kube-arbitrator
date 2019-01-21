@@ -7,7 +7,7 @@ This directory is used to manage contribution for an enhanced queuejob controlle
 
 The extended queuejob controller `xqueuejob-controller` is a controler to manage batch jobs in Kubernetes, providing mechanisms for applications which would like to run batch jobs leveraging Kubernetes. 
 
-Refer to [deployment](contrib/DLaaS/deployment/deployment.md) on how to deploy `xqueuejob-controller` as in Kubernetes.
+Refer to [deployment](deployment/deployment.md) on how to deploy `xqueuejob-controller` as in Kubernetes.
 
 Refer to [tutorial](doc/usage/tutorial.md) on how to use `kube-batch` to run batch job in Kubernetes
 

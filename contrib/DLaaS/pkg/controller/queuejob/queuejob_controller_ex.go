@@ -301,40 +301,49 @@ func (qjm *XController) getAggregatedAvailableResourcesPriority(targetpr int, cq
 	r := schedulerapi.EmptyResource()
 	total := schedulerapi.EmptyResource()
 	allocated := schedulerapi.EmptyResource()
-	
+	used := schedulerapi.EmptyResource()
+	idle := schedulerapi.EmptyResource()
+	preemptable := schedulerapi.EmptyResource()
+
 	for _, value := range cluster.Nodes {
 		total = total.Add(value.Allocatable)
+		used = used.Add(value.Used)
+		idle = idle.Add(value.Idle)
 	}
-
 	queueJobs, err := qjm.queueJobLister.XQueueJobs("").List(labels.Everything())
-        if err != nil {
-                glog.Errorf("I return list of queueJobs %+v", err)
-                return r
-        }
+	if err != nil {
+		glog.Errorf("I return list of queueJobs %+v", err)
+		return r
+	}
 
 	for _, value := range queueJobs {
 		if value.Name == cqj {
 			continue
 		}
-		if value.Status.State != arbv1.QueueJobStateActive {
+		if !value.Status.CanRun {
 			continue
 		}
-		glog.Infof("Job with priority: %s %v", value.Name, value.Spec.Priority)
 		if value.Spec.Priority >= targetpr {
 			for _, resctrl := range qjm.qjobResControls {
-				qjv	:= resctrl.GetAggregatedResources(value)
+				qjv := resctrl.GetAggregatedResources(value)
 				allocated = allocated.Add(qjv)
+			}
+		} else {
+			for _, resctrl := range qjm.qjobResControls {
+				qjv := resctrl.GetAggregatedResources(value)
+				preemptable = preemptable.Add(qjv)
 			}
 		}
 	}
 
-	glog.Infof("I have allocated %+v, total %+v", total, allocated)
-
+	glog.V(4).Infof("I have allocated %+v high priority jobs, preemptable %+v, total capacity %+v, used %+v, idle %+v", allocated, preemptable, total, used, idle)
 	if allocated.MilliCPU > total.MilliCPU || allocated.Memory > total.Memory || allocated.GPU > total.GPU {
+		glog.V(4).Infof("I have %+v available resources to schedule", r)
 		return r
 	}
-	
-	r = total.Sub(allocated)
+
+	r = idle.Add(preemptable)
+	glog.V(4).Infof("I have %+v available resources to schedule", r)
 	return r
 }
 
