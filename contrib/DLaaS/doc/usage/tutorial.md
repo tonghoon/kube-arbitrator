@@ -1,4 +1,4 @@
-# Tutorial of xqueuejob-controller
+# Tutorial of Extended QueueJob Controller
 
 This doc will show how to run `xqueuejob-controller` as a kubernetes custom resource definition. It is for [master](https://github.com/kubernetes-sigs/kube-batch/tree/master) branch.
 
@@ -11,9 +11,9 @@ To run `xqueuejob-controller`, a Kubernetes cluster must start up. Here is a doc
 
 #### Deploy `kube-batch` by Helm
 
-Follow these [instructions](../../deployment/deployment.md) to install the `xqueuejob-controller` as a custom resource definition using Helm.
+Follow the instructions [here](../../deployment/deployment.md) to install the `xqueuejob-controller` as a custom resource definition using [Helm](../../deployment/deployment.md).
 
-### (3) Create a Job
+### 3. Create a Job
 
 Create a file named `qj-02.yaml` with the following content:
 
