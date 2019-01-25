@@ -1,24 +1,23 @@
-#Deploying Extended QueueJob
+# Deploying Extended QueueJob
 Follow the instructions below to deploy the kube-batch extended queuejob in an existing Kubernetes cluster:
 
-##Prerequisitis:
-- Cluster running Kubernetes v1.10 or highter.
-### 1. Cluster running Kubernetes v1.10 or highter.
+## Pre-Reqs
+### - Cluster running Kubernetes v1.10 or highter.
 ```
 kubectl version
 ```
-### 2. Access to the `kube-system` namespace.
+### - Access to the `kube-system` namespace.
 ```
 kubectl get pods -n kube-system
 ```
-### 3. Install the Helm Package Manager
+### - Install the Helm Package Manager
 Install the Helm Client on your local machine and the Helm Cerver on your kubernetes cluster.  Helm installation documentation is [here]
 (https://docs.helm.sh/using_helm/#installing-helm).  After you install Helm you can list the Help packages installed with the following command:
 ```
 helm list
 ```
 
-##Installation:
+## Installation Instructions
 ### 1. Download the github project.
 Download this github project to your local machine.  
 ```
@@ -30,11 +29,12 @@ cd kube-arbitrator
 git checkout xqueuejob_contrib_helm_fix
 cd contrib/DLaaS/deployment
 ```
-### 3. Determine if you cluster has enough resources for installating the Helm chart.
+### 3. Determine if the cluster has enough resources for installing the Helm chart for the Enhanced QueueJob.
 
 The default memory resource demand for the extended queuejob controller is `2G`.  If your cluster is a small installation such as MiniKube you will want to adjust the Helm installation resource requests accordingly.  
 
-To find out available compute node on your cluster enter the following command:
+
+To list available compute nodes on your cluster enter the following command:
 ```
 kubektl get nodes
 ```
@@ -45,7 +45,7 @@ $ kubectl get nodes
      minikube   Ready     master    91d       v1.10.0
 ```
 
-To find out the available resources in you cluster inspect each node with the following command:
+To find out the available resources in you cluster inspect each node from the command output above with the following command:
 ```
 kubectl describe node <node_name>
 ```
@@ -76,11 +76,13 @@ Allocated resources:
   Resource  Requests      Limits
   --------  --------      ------
   cpu       1915m (95%)   1 (50%)
-  memory    1854Mi (98%)  1364Mi (72%)
+  memory    1254Mi (66%)  1364Mi (72%)
 Events:     <none>
-```
 
-### 3. Run the installation Helm chart.
+```
+In the example above, there is only one node (`minikube`) in the cluster with the majority of the cluster memory used (`1,254Mi` used out of `1,936Mi` allocatable capacity) leaving less than `700Mi` available capacity for new pod deployments in the cluster.  Since the default memory demand for the Enhanced QueueuJob Controller pod is `2G` the cluster has insufficient memory to deploy the controller.  Instruction notes provided below show how to override the defaults according to the available capacity in your cluster.
+
+### 4. Run the installation using Helm.
 Install the Extended QueueJob Controller using the command below.  If you do not have enough compute resources in your cluster you can adjust the resource request via the command line.  See an example in the `Note` below.  
 ```
 helm install kube-arbitrator --namespace kube-system
@@ -90,7 +92,7 @@ NOTE: You can adjust the cpu and memory demands of the deployment with command l
 helm install kube-arbitrator --namespace kube-system --set resources.requests.cpu=1000m --set resources.requests.memory=1024Mi --set resources.limits.cpu=1000m --set resources.limits.memory=1024Mi
 ```
 
-### 3. Verify the installation.
+### 5. Verify the installation.
 List the Helm installations.
 ```
 helm list
@@ -101,11 +103,11 @@ List the Extended QueueJobs
 kubectl get xqueuejobs
 ```
 
-Use the [tutorial](../doc/usage/tutorial.md) to deploy an `xqueuejob`.
+Since no `xqueuejobs` have been deploy yet to your cluster you should receive a message indicating `No resources found.` for `xqueuejobs` but your cluster now has `xqueuejobs` enabled.  Use the [tutorial](../doc/usage/tutorial.md) to deploy an example `xqueuejob`.
 
-### 4.  Remove the Extended QueueJob Controller from your cluster.
+### 6.  Remove the Extended QueueJob Controller from your cluster.
 
-List the deployed Helm charts and identify the name of the installation.
+List the deployed Helm charts and identify the name of the Extended QueueJob Controller installation.
 ```bash
 helm list
 ```

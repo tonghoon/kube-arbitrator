@@ -55,7 +55,7 @@ spec:
                      memory: "300Mi"
 ```
 
-The yaml file means a Job named `helloworld-2` to create 2 pods, these pods will be scheduled by kubernetes scheduler.
+The yaml file above is used to a QueueJob named `helloworld-2` which encompases a stateful set with create 2 pods.  These 2 pods will be scheduled by kubernetes scheduler.
 
 Create the Job
 
@@ -74,5 +74,8 @@ helloworld-2          1h
 Check the pods status
 
 ```bash
-# kubectl get pod --all-namespaces
+# kubectl get pods --all-namespaces
 ```
+### 4. Demonstrating Queueing of a QueueJob
+
+When 
