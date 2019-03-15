@@ -21,24 +21,13 @@ import (
 	"strings"
 )
 
-type arrayFlags []string
-
-func (i *arrayFlags) String() string {
-    return "my string representation"
-}
-
-func (arr *arrayFlags) Set(s string) error {
-    *arr = strings.Split(s, " ")
-    return nil
-}
-
 // ServerOption is the main context object for the controller manager.
 type ServerOption struct {
 	Master     string
 	Kubeconfig string
 	SchedulerName string
 	Dispatcher	bool
-	AgentConfigs arrayFlags
+	AgentConfigs string
 }
 
 // NewServerOption creates a new CMServer with a default config.
@@ -53,7 +42,7 @@ func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.BoolVar(&s.Dispatcher,"dispatcher",false,"set dispather mode(true) or agent mode(false)")
-	fs.Var(&s.AgentConfigs, "agentconfigs", "Paths to agent config file separted by commas(,)")
+	fs.StringVar(&s.AgentConfigs, "agentconfigs", s.AgentConfigs, "Paths to agent config file;deploymentName separted by commas(,)")
 }
 
 func (s *ServerOption) CheckOptionOrDie() {

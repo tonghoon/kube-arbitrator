@@ -18,6 +18,7 @@ package queuejob
 
 import (
 	"fmt"
+	"strings"
 	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -164,7 +165,7 @@ func getQueueJobKey(obj interface{}) (string, error) {
 }
 
 //NewXQueueJobController create new XQueueJob Controller
-func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatcher bool, agentconfigs []string) *XController {
+func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatcher bool, agentconfigs string) *XController {
 	cc := &XController{
 		config:      config,
 		clients:     kubernetes.NewForConfigOrDie(config),
@@ -261,7 +262,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 
 	//create agents and agentMap
 	agentMap=map[string]*xQueueJobAgent.XQueueJobAgent{}
-	for _, agentconfig := range agentconfigs {
+	for _, agentconfig := range strings.Split(agentconfigs,",") {
 		agentMap[agentconfig]=NewXQueueJobAgent(agentconfig)
 	}
 
