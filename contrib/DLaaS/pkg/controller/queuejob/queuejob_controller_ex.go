@@ -53,6 +53,9 @@ import (
 	arbinformers "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion"
 	informersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion/v1"
 	listersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/listers/controller/v1"
+
+	queuejobdispatch "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/queuejobdispatch"
+
 )
 
 const (
@@ -106,6 +109,32 @@ type XController struct {
 
 	// is dispatcher or deployer?
 	isDispatcher bool
+
+	// Agent map: agentID -> XQueueJobAgent
+	agentMap map[string]*queuejobdispatch.XQueueJobAgent
+
+	// Store for XQueueJob -> XQueueJobAgent
+	dispatchStore *cache.Store
+}
+
+type XQueueJobAndAgent struct{
+	queueJobKey string
+	queueJobAgentKey string
+}
+
+func NewXQueueJobAndAgent(qjKey string, qaKey string) *XQueueJobAndAgent {
+	return &XQueueJobAngAgent{
+		queueJobKey: qjKey,
+		queueJobAgentKey: qaKey
+	}
+}
+
+func getQueueJobAndAgentKey(obj interface{}) (string, error) {
+	qja, ok := obj.(*XqueueJobAndAgent)
+	if !ok {
+		return "", fmt.Errorf("not a XQueueJobAndAgent")
+	}
+	return fmt.Sprintf("%s", qja.queueJobKey)
 }
 
 //RegisterAllQueueJobResourceTypes - gegisters all resources
@@ -116,7 +145,16 @@ func RegisterAllQueueJobResourceTypes(regs *queuejobresources.RegisteredResource
 	resstatefulset.Register(regs)
 }
 
-func queueJobKey(obj interface{}) (string, error) {
+func getQueueJobAgentKey(obj interface{}) (string, error) {
+	qa, ok := obj.(*queuejobdispatch.XQueueJobAgent)
+	if !ok {
+		return "", fmt.Errorf("not a XQueueAgent")
+	}
+	return fmt.Sprintf("%s;%s", qa.agentId, qa.deploymentName)
+}
+
+
+func getQueueJobKey(obj interface{}) (string, error) {
 	qj, ok := obj.(*arbv1.XQueueJob)
 	if !ok {
 		return "", fmt.Errorf("not a XQueueJob")
@@ -126,14 +164,14 @@ func queueJobKey(obj interface{}) (string, error) {
 }
 
 //NewXQueueJobController create new XQueueJob Controller
-func NewXQueueJobController(config *rest.Config, schedulerName string) *XController {
+func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatcher bool, agentconfigs []string) *XController {
 	cc := &XController{
 		config:      config,
 		clients:     kubernetes.NewForConfigOrDie(config),
 		arbclients:  clientset.NewForConfigOrDie(config),
-		eventQueue:  cache.NewFIFO(queueJobKey),
-		initQueue:   cache.NewFIFO(queueJobKey),
-		updateQueue: cache.NewFIFO(queueJobKey),
+		eventQueue:  cache.NewFIFO(getQueueJobKey),
+		initQueue:   cache.NewFIFO(getQueueJobKey),
+		updateQueue: cache.NewFIFO(getQueueJobKey),
 		qjqueue:	  NewSchedulingQueue(),
 		cache:		  schedulercache.New(config, schedulerName),
 	}
@@ -218,6 +256,18 @@ func NewXQueueJobController(config *rest.Config, schedulerName string) *XControl
 	//create sub-resource reference manager
 	cc.refManager = queuejobresources.NewLabelRefManager()
 
+	// Set dispatcher mode or agent mode
+	cc.isDispatcher=isDispatcher
+
+	//create agents and agentMap
+	agentMap=map[string]*xQueueJobAgent.XQueueJobAgent{}
+	for _, agentconfig := range agentconfigs {
+		agentMap[agentconfig]=NewXQueueJobAgent(agentconfig)
+	}
+
+	//create (empty) dispatchMap
+	dispatchStore=cache.NewStore(getQueueJobAndAgentKey)
+
 	return cc
 }
 
@@ -235,7 +285,6 @@ func (qjm *XController) PreemptQueueJobs() {
 		}
 	}
 }
-
 
 func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 	qjobs := make([]*arbv1.XQueueJob, 0)
@@ -372,18 +421,32 @@ func (qjm *XController) ScheduleNext() {
 	// Get resouce requirement of the queue-job
 	aggqj := qjm.GetAggregatedResources(qj)
 
-	if (qjm.isDispatcher) {	// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
-													// If a cluster is chosen,
+	if (qjm.isDispatcher) {
+		// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
+		for agentID, xqueueAgent:= range qjm.agentMap {
+			resouces := xqueueAgent.aggrResouces
+			if aggqj.LessEqual(resources) {
+				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
+				if e != nil {
+					return
+				}
+				newjob.Status.CanRun = true
+				qj.Status.CanRun = true
+				if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
+														glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+																		qj.Namespace, qj.Name, err)
+				}
+				// qjm.dispatchMap[queueJobKey(qj)]=agentID
+				qjm.dispatchStore(NewXQueueJobAndAgent(getQueueJobKey(qj),getQueueJobAgentKey(qa)))
 
+				return
+			}
+		} else {
+			go qjm.backoff(qj)
+		}
 	}
 	else{		// Agent routine to check if there is enough resources in this cluster
-
-		// if scheduling error:
-		// start thread that backs-off and puts back the QJ in the queue
 		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
-		// get agg resources for the current qj
-
-
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
 		if aggqj.LessEqual(resources) {
@@ -400,44 +463,17 @@ func (qjm *XController) ScheduleNext() {
 			newjob.Status.CanRun = true
 			qj.Status.CanRun = true
 			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-	                        glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-	                                qj.Namespace, qj.Name, err)
-	                }
+													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+																	qj.Namespace, qj.Name, err)
+									}
 		} else {
 			// start thread to backoff
 			go qjm.backoff(qj)
 		}
 	}
 
-	// resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
-	// // get agg resources for the current qj
-	// aggqj := qjm.GetAggregatedResources(qj)
-	//
-	// glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
-	//
-	// if aggqj.LessEqual(resources) {
-	// 	// qj is ready to go!
-	// 	newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
-	// 	if e != nil {
-	// 		return
-	// 	}
-	// 	desired := int32(0)
-	// 	for i, ar := range newjob.Spec.AggrResources.Items {
-	// 		desired += ar.Replicas
-	// 		newjob.Spec.AggrResources.Items[i].AllocatedReplicas = ar.Replicas
-	// 	}
-	// 	newjob.Status.CanRun = true
-	// 	qj.Status.CanRun = true
-	// 	if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-  //                       glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-  //                               qj.Namespace, qj.Name, err)
-  //               }
-	// } else {
-	// 	// start thread to backoff
-	// 	go qjm.backoff(qj)
-	// }
-
 }
+
 
 func (qjm *XController) backoff(q *arbv1.XQueueJob) {
 	time.Sleep(initialGetBackoff)
@@ -573,9 +609,12 @@ func (cc *XController) syncQueueJob(qj *arbv1.XQueueJob) error {
 		return err
 	}
 
-	// we call sync for each controller
-  // update pods running, pending,...
-  cc.qjobResControls[arbv1.ResourceTypePod].UpdateQueueJobStatus(qj)
+	// If it is Agent (not a dispatcher), update pod information
+	if(!cc.isDispatcher){
+		// we call sync for each controller
+	  // update pods running, pending,...
+	  cc.qjobResControls[arbv1.ResourceTypePod].UpdateQueueJobStatus(qj)
+	}
 
 	return cc.manageQueueJob(queueJob)
 }
@@ -590,86 +629,173 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		glog.Infof("Finished syncing queue job %q (%v)", qj.Name, time.Now().Sub(startTime))
 	}()
 
-	if qj.DeletionTimestamp != nil {
-		// cleanup resources for running job
-		err = cc.Cleanup(qj)
-		if err != nil {
-			return err
-		}
-		//empty finalizers and delete the queuejob again
-		accessor, err := meta.Accessor(qj)
-		if err != nil {
-			return err
-		}
-		accessor.SetFinalizers(nil)
 
-		// we delete the job from the queue if it is there
-		cc.qjqueue.Delete(qj)
+	if(!cc.isDispatcher) {
 
-		return nil
-		//var result arbv1.XQueueJob
-		//return cc.arbclients.Put().
-		//	Namespace(qj.Namespace).Resource(arbv1.QueueJobPlural).
-		//	Name(qj.Name).Body(qj).Do().Into(&result)
-	}
+		if qj.DeletionTimestamp != nil {
+			// cleanup resources for running job
+			err = cc.Cleanup(qj)
+			if err != nil {
+				return err
+			}
+			//empty finalizers and delete the queuejob again
+			accessor, err := meta.Accessor(qj)
+			if err != nil {
+				return err
+			}
+			accessor.SetFinalizers(nil)
 
-	glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
+			// we delete the job from the queue if it is there
+			cc.qjqueue.Delete(qj)
 
-	if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
-		// if there are running resources for this job then delete them because the job was put in
-		// pending state...
-		glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
-		err = cc.Cleanup(qj)
-		if err != nil {
-			return err
+			return nil
+			//var result arbv1.XQueueJob
+			//return cc.arbclients.Put().
+			//	Namespace(qj.Namespace).Resource(arbv1.QueueJobPlural).
+			//	Name(qj.Name).Body(qj).Do().Into(&result)
 		}
 
-		qj.Status.State = arbv1.QueueJobStateEnqueued
-		_, err = cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+		glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
 
-
-	if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
-		glog.Infof("Putting job in queue!")
-		cc.qjqueue.AddIfNotPresent(qj)
-		return nil
-	}
-
-	if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
-		qj.Status.State =  arbv1.QueueJobStateActive
-	}
-
-	if qj.Spec.AggrResources.Items != nil {
-		for i := range qj.Spec.AggrResources.Items {
-			err := cc.refManager.AddTag(&qj.Spec.AggrResources.Items[i], func() string {
-				return strconv.Itoa(i)
-			})
+		if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
+			// if there are running resources for this job then delete them because the job was put in
+			// pending state...
+			glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
+			err = cc.Cleanup(qj)
 			if err != nil {
 				return err
 			}
 
+			qj.Status.State = arbv1.QueueJobStateEnqueued
+			_, err = cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj)
+			if err != nil {
+				return err
+			}
+			return nil
 		}
-	}
 
-	for _, ar := range qj.Spec.AggrResources.Items {
-		err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
-		if err00 != nil {
-			glog.Infof("I have error from sync job: %v", err00)
+
+		if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
+			glog.Infof("Putting job in queue!")
+			cc.qjqueue.AddIfNotPresent(qj)
+			return nil
 		}
+
+		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
+			qj.Status.State =  arbv1.QueueJobStateActive
+		}
+		if qj.Spec.AggrResources.Items != nil {
+			for i := range qj.Spec.AggrResources.Items {
+				err := cc.refManager.AddTag(&qj.Spec.AggrResources.Items[i], func() string {
+					return strconv.Itoa(i)
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		for _, ar := range qj.Spec.AggrResources.Items {
+			err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
+			if err00 != nil {
+				glog.Infof("I have error from sync job: %v", err00)
+			}
+		}
+
+		// TODO(k82cn): replaced it with `UpdateStatus`
+		if _, err := cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj); err != nil {
+			glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+				qj.Namespace, qj.Name, err)
+			return err
+		}
+
+	}	else { // isDispatcher is True
+
+		if qj.DeletionTimestamp != nil {
+			// cleanup resources for running job
+			err = cc.Cleanup(qj)
+			if err != nil {
+				return err
+			}
+			//empty finalizers and delete the queuejob again
+			accessor, err := meta.Accessor(qj)
+			if err != nil {
+				return err
+			}
+			accessor.SetFinalizers(nil)
+
+			// we delete the job from the queue if it is there
+			cc.qjqueue.Delete(qj)
+
+			return nil
+			//var result arbv1.XQueueJob
+			//return cc.arbclients.Put().
+			//	Namespace(qj.Namespace).Resource(arbv1.QueueJobPlural).
+			//	Name(qj.Name).Body(qj).Do().Into(&result)
+		}
+
+		glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
+
+		if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
+			// if there are running resources for this job then delete them because the job was put in
+			// pending state...
+			glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
+			err = cc.Cleanup(qj)
+			if err != nil {
+				return err
+			}
+
+			qj.Status.State = arbv1.QueueJobStateEnqueued
+			_, err = cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
+			glog.Infof("Putting job in queue!")
+			cc.qjqueue.AddIfNotPresent(qj)
+			return nil
+		}
+
+		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
+			qj.Status.State =  arbv1.QueueJobStateActive
+		}
+
+		// if qj.Spec.AggrResources.Items != nil {
+		// 	for i := range qj.Spec.AggrResources.Items {
+		// 		err := cc.refManager.AddTag(&qj.Spec.AggrResources.Items[i], func() string {
+		// 			return strconv.Itoa(i)
+		// 		})
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 	}
+		// }
+
+		obj, exi, err:=dispatchStore.GetBykey(getQueueJobKey(qj))
+		if exi {
+			agentMap[obj.(string)].CreateXQueueJob(qj)
+		} else {
+			return err
+		}
+
+		// for _, ar := range qj.Spec.AggrResources.Items {
+		// 	err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
+		// 	if err00 != nil {
+		// 		glog.Infof("I have error from sync job: %v", err00)
+		// 	}
+		// }
+
+		// TODO(k82cn): replaced it with `UpdateStatus`
+		if _, err := cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj); err != nil {
+			glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+				qj.Namespace, qj.Name, err)
+			return err
+		}
+
 	}
-
-	// TODO(k82cn): replaced it with `UpdateStatus`
-	if _, err := cc.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(qj); err != nil {
-		glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-			qj.Namespace, qj.Name, err)
-		return err
-	}
-
-
 	return err
 }
 
