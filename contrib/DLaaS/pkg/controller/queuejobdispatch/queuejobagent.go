@@ -18,15 +18,15 @@ package queuejobdispatch
 
 import (
 	"strings"
-	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
-	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
+	// clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
+	// schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 )
 
 type XQueueJobAgent struct{
 		agentId			string
 		deploymentName	string
-		clients			*clientset.Clientset
-		aggrResouces *schedulerapi.Resource
+		// clients			*clientset.Clientset
+		// aggrResouces *schedulerapi.Resource
 }
 
 func NewXQueueJobAgent(config string) *XQueueJobAgent {
@@ -37,15 +37,15 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	qa := &XQueueJobAgent{
 		agentId:	configStrings[0],
 		deploymentName: configStrings[1],
-		clients:	clientset.NewForConfigOrDie(config)
+		// clients:	clientset.NewForConfigOrDie(config)
 	}
 	return qa
 }
 
-func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
-	return nil
-}
+// func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
+// 	return nil
+// }
 
-func (qa *XQueueJobAgent) UpdateAggrResources() error {
-	return nil
-}
+// func (qa *XQueueJobAgent) UpdateAggrResources() error {
+// 	return nil
+// }

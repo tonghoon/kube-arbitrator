@@ -776,11 +776,11 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// }
 
 		obj, exi, err:=dispatchStore.GetBykey(getQueueJobKey(qj))
-		if exi {
-			agentMap[obj.(string)].CreateXQueueJob(qj)
-		} else {
-			return err
-		}
+		// if exi {
+		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
+		// } else {
+		// 	return err
+		// }
 
 		// for _, ar := range qj.Spec.AggrResources.Items {
 		// 	err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
