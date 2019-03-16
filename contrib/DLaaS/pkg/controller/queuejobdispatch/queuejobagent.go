@@ -23,7 +23,7 @@ import (
 )
 
 type XQueueJobAgent struct{
-		agentID			string
+		agentId			string
 		deploymentName	string
 		clients			*clientset.Clientset
 		aggrResouces *schedulerapi.Resource
@@ -34,22 +34,18 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	qa := &XqueueJobAgent{
+	qa := &XQueueJobAgent{
 		agentId:	configStrings[0],
-		deplymentName: configStrings[1],
+		deploymentName: configStrings[1],
 		clients:	clientset.NewForConfigOrDie(config)
 	}
 	return qa
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
-	var err error
-
 	return nil
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
-	var err error
-
 	return nil
 }
