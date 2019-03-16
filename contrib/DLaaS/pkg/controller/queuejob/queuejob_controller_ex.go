@@ -422,30 +422,30 @@ func (qjm *XController) ScheduleNext() {
 	// Get resouce requirement of the queue-job
 	aggqj := qjm.GetAggregatedResources(qj)
 
-	if (qjm.isDispatcher) {
-		// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
-		for agentID, xqueueAgent:= range qjm.agentMap {
-			resouces := xqueueAgent.aggrResouces
-			if aggqj.LessEqual(resources) {
-				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
-				if e != nil {
-					return
-				}
-				newjob.Status.CanRun = true
-				qj.Status.CanRun = true
-				if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-														glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-																		qj.Namespace, qj.Name, err)
-				}
-				// qjm.dispatchMap[queueJobKey(qj)]=agentID
-				qjm.dispatchStore(NewXQueueJobAndAgent(getQueueJobKey(qj),getQueueJobAgentKey(qa)))
-
-				return
-			}
-		} else {
-			go qjm.backoff(qj)
-		}
-	} else {		// Agent routine to check if there is enough resources in this cluster
+	// if (qjm.isDispatcher) {
+	// 	// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
+	// 	for agentID, xqueueAgent:= range qjm.agentMap {
+	// 		resouces := xqueueAgent.aggrResouces
+	// 		if aggqj.LessEqual(resources) {
+	// 			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
+	// 			if e != nil {
+	// 				return
+	// 			}
+	// 			newjob.Status.CanRun = true
+	// 			qj.Status.CanRun = true
+	// 			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
+	// 													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+	// 																	qj.Namespace, qj.Name, err)
+	// 			}
+	// 			// qjm.dispatchMap[queueJobKey(qj)]=agentID
+	// 			qjm.dispatchStore(NewXQueueJobAndAgent(getQueueJobKey(qj),getQueueJobAgentKey(qa)))
+	//
+	// 			return
+	// 		}
+	// 	} else {
+	// 		go qjm.backoff(qj)
+	// 	}
+	// } else {		// Agent routine to check if there is enough resources in this cluster
 		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
@@ -470,7 +470,7 @@ func (qjm *XController) ScheduleNext() {
 			// start thread to backoff
 			go qjm.backoff(qj)
 		}
-	}
+	// }
 
 }
 
