@@ -35,7 +35,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	agent_config, error:=clientcmd.BuildConfigFromFlags("", configStrings[0])
+	agent_config, _:=clientcmd.BuildConfigFromFlags("", configStrings[0])
 	qa := &XQueueJobAgent{
 		agentId:	configStrings[0],
 		deploymentName: configStrings[1],
