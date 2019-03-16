@@ -261,13 +261,13 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	cc.isDispatcher=isDispatcher
 
 	//create agents and agentMap
-	cc.agentMap=map[string]*XQueueJobAgent.XQueueJobAgent{}
+	cc.agentMap=map[string]*queuejobdispatch.XQueueJobAgent{}
 	for _, agentconfig := range strings.Split(agentconfigs,",") {
 		cc.agentMap[agentconfig]=queuejobdispatch.NewXQueueJobAgent(agentconfig)
 	}
 
 	//create (empty) dispatchMap
-	dispatchStore=cache.NewStore(getQueueJobAndAgentKey)
+	cc.dispatchStore=cache.NewStore(getQueueJobAndAgentKey)
 
 	return cc
 }
@@ -774,7 +774,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// 	}
 		// }
 
-		obj, exi, err:=dispatchStore.GetBykey(getQueueJobKey(qj))
+		obj, exi, err:=cc.dispatchStore.GetBykey(getQueueJobKey(qj))
 		// if exi {
 		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
 		// } else {
@@ -801,7 +801,6 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 
 //Cleanup function
 func (cc *XController) Cleanup(queuejob *arbv1.XQueueJob) error {
-sdf
 	glog.Infof("Calling cleanup for XQueueJob %s \n", queuejob.Name)
 	if queuejob.Spec.AggrResources.Items != nil {
 		// we call clean-up for each controller
