@@ -124,18 +124,18 @@ type XQueueJobAndAgent struct{
 }
 
 func NewXQueueJobAndAgent(qjKey string, qaKey string) *XQueueJobAndAgent {
-	return &XQueueJobAngAgent{
+	return &XQueueJobAndAgent{
 		queueJobKey: qjKey,
 		queueJobAgentKey: qaKey,
 	}
 }
 
 func getQueueJobAndAgentKey(obj interface{}) (string, error) {
-	qja, ok := obj.(*XqueueJobAndAgent)
+	qja, ok := obj.(*XQueueJobAndAgent)
 	if !ok {
 		return "", fmt.Errorf("not a XQueueJobAndAgent")
 	}
-	return fmt.Sprintf("%s", qja.queueJobKey)
+	return fmt.Sprintf("%s", qja.queueJobKey), nil
 }
 
 //RegisterAllQueueJobResourceTypes - gegisters all resources
@@ -151,7 +151,7 @@ func getQueueJobAgentKey(obj interface{}) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("not a XQueueAgent")
 	}
-	return fmt.Sprintf("%s;%s", qa.agentId, qa.deploymentName)
+	return fmt.Sprintf("%s;%s", qa.agentId, qa.deploymentName), nil
 }
 
 
@@ -261,9 +261,9 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	cc.isDispatcher=isDispatcher
 
 	//create agents and agentMap
-	agentMap=map[string]*xQueueJobAgent.XQueueJobAgent{}
+	cc.agentMap=map[string]*XQueueJobAgent.XQueueJobAgent{}
 	for _, agentconfig := range strings.Split(agentconfigs,",") {
-		agentMap[agentconfig]=NewXQueueJobAgent(agentconfig)
+		cc.agentMap[agentconfig]=queuejobdispatch.NewXQueueJobAgent(agentconfig)
 	}
 
 	//create (empty) dispatchMap
