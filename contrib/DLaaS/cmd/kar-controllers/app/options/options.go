@@ -18,7 +18,6 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	"strings"
 )
 
 // ServerOption is the main context object for the controller manager.
