@@ -126,7 +126,7 @@ type XQueueJobAndAgent struct{
 func NewXQueueJobAndAgent(qjKey string, qaKey string) *XQueueJobAndAgent {
 	return &XQueueJobAngAgent{
 		queueJobKey: qjKey,
-		queueJobAgentKey: qaKey
+		queueJobAgentKey: qaKey,
 	}
 }
 
@@ -445,8 +445,7 @@ func (qjm *XController) ScheduleNext() {
 		} else {
 			go qjm.backoff(qj)
 		}
-	}
-	else{		// Agent routine to check if there is enough resources in this cluster
+	} else {		// Agent routine to check if there is enough resources in this cluster
 		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
