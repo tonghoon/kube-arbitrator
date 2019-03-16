@@ -18,14 +18,15 @@ package queuejobdispatch
 
 import (
 	"strings"
-	// clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
+	"k8s.io/client-go/tools/clientcmd"
+	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
 	// schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 )
 
 type XQueueJobAgent struct{
 		agentId			string
 		deploymentName	string
-		// clients			*clientset.Clientset
+		clients			*clientset.Clientset
 		// aggrResouces *schedulerapi.Resource
 }
 
@@ -37,7 +38,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	qa := &XQueueJobAgent{
 		agentId:	configStrings[0],
 		deploymentName: configStrings[1],
-		// clients:	clientset.NewForConfigOrDie(config)
+		clients:	clientset.NewForConfigOrDie(clientcmd.BuildConfigFromFlags("", configStrings[0])),
 	}
 	return qa
 }
