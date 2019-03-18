@@ -55,7 +55,7 @@ import (
 	informersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion/v1"
 	listersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/listers/controller/v1"
 
-	queuejobdispatch "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/"
+	queuejobdispatch "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/queuejobdispatch"
 
 )
 
