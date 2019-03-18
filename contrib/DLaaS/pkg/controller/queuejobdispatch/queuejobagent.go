@@ -44,9 +44,10 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	return qa
 }
 
-// func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
-// 	return nil
-// }
+func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
+	
+	return nil
+}
 
 // func (qa *XQueueJobAgent) UpdateAggrResources() error {
 // 	return nil

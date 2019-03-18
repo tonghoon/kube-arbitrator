@@ -776,6 +776,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 
 		queuejobKey, _:=GetQueueJobKey(qj)
 		obj:=cc.dispatchMap[queuejobKey]
+		agentMap[obj].CreateXQueueJob(qj)
 		// if exi {
 		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
 		// } else {
