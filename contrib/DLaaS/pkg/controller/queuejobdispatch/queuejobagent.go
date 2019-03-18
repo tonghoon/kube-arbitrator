@@ -23,14 +23,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
 	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
-	// schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
+	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 )
 
 type XQueueJobAgent struct{
 		AgentId			string
 		DeploymentName	string
 		queuejobclients			*clientset.Clientset
-		// aggrResouces *schedulerapi.Resource
+		AggrResouces *schedulerapi.Resource
 }
 
 func NewXQueueJobAgent(config string) *XQueueJobAgent {
