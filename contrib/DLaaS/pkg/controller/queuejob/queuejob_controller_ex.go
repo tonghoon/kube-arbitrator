@@ -422,11 +422,37 @@ func (qjm *XController) ScheduleNext() {
 	// Get resouce requirement of the queue-job
 	aggqj := qjm.GetAggregatedResources(qj)
 
-	resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+
 	if qjm.isDispatcher {
 		resources = qjm.GetAggregatedResources(qj)
+		if aggqj.LessEqual(resources) {
+				glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
+		}
 	} else {
-		resources = qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
+
+		if aggqj.LessEqual(resources) {
+			// qj is ready to go!
+			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
+			if e != nil {
+				return
+			}
+			desired := int32(0)
+			for i, ar := range newjob.Spec.AggrResources.Items {
+				desired += ar.Replicas
+				newjob.Spec.AggrResources.Items[i].AllocatedReplicas = ar.Replicas
+			}
+			newjob.Status.CanRun = true
+			qj.Status.CanRun = true
+			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
+													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+																	qj.Namespace, qj.Name, err)
+									}
+		} else {
+			// start thread to backoff
+			go qjm.backoff(qj)
+		}
 	}
 	// 	// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
 	// 	for agentID, xqueueAgent:= range qjm.agentMap {
@@ -452,29 +478,6 @@ func (qjm *XController) ScheduleNext() {
 	// 	}
 	// } else {		// Agent routine to check if there is enough resources in this cluster
 		// resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
-		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
-
-		if aggqj.LessEqual(resources) {
-			// qj is ready to go!
-			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
-			if e != nil {
-				return
-			}
-			desired := int32(0)
-			for i, ar := range newjob.Spec.AggrResources.Items {
-				desired += ar.Replicas
-				newjob.Spec.AggrResources.Items[i].AllocatedReplicas = ar.Replicas
-			}
-			newjob.Status.CanRun = true
-			qj.Status.CanRun = true
-			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-																	qj.Namespace, qj.Name, err)
-									}
-		} else {
-			// start thread to backoff
-			go qjm.backoff(qj)
-		}
 	// }
 
 }
