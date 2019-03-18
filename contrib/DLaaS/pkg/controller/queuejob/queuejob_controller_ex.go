@@ -424,7 +424,7 @@ func (qjm *XController) ScheduleNext() {
 
 
 	if qjm.isDispatcher {
-		resources = qjm.GetAggregatedResources(qj)
+		resources := qjm.GetAggregatedResources(qj)
 		if aggqj.LessEqual(resources) {
 				glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 		}
