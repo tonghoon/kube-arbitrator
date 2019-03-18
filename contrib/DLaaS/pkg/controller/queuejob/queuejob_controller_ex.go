@@ -423,7 +423,7 @@ func (qjm *XController) ScheduleNext() {
 	aggqj := qjm.GetAggregatedResources(qj)
 
 	if (qjm.isDispatcher) {
-		resouces := qjm.GetAggregatedResources(qj)
+		resources := qjm.GetAggregatedResources(qj)
 	} else {
 		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 	}
@@ -450,7 +450,7 @@ func (qjm *XController) ScheduleNext() {
 	// 		go qjm.backoff(qj)
 	// 	}
 	// } else {		// Agent routine to check if there is enough resources in this cluster
-		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+		// resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
 		if aggqj.LessEqual(resources) {
