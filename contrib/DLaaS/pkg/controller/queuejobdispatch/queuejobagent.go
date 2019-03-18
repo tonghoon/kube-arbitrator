@@ -17,7 +17,10 @@ limitations under the License.
 package queuejobdispatch
 
 import (
+	"fmt"
 	"strings"
+	"github.com/golang/glog"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
 	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
@@ -27,7 +30,7 @@ import (
 type XQueueJobAgent struct{
 		AgentId			string
 		DeploymentName	string
-		clients			*clientset.Clientset
+		queuejobclients			*clientset.Clientset
 		// aggrResouces *schedulerapi.Resource
 }
 
@@ -36,17 +39,20 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	agent_config, _:=clientcmd.BuildConfigFromFlags("", configStrings[0])
+	agent_config, err:=clientcmd.BuildConfigFromFlags("", configStrings[0])
+	if err!=nil {
+		return nil
+	}
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
-		clients:	clientset.NewForConfigOrDie(agent_config),
+		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
 	}
 	return qa
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
-
+	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
 	return nil
 }
 
