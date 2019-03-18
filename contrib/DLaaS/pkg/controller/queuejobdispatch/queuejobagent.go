@@ -53,7 +53,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
-	qa.queuejobclients.XQueueJobs(cqj.Namespace).Create(cqj)
+	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
 	return
 }
 
