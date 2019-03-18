@@ -198,7 +198,7 @@ func (qjrService *QueueJobResDeployment) createDeploymentWithControllerRef(names
 	glog.V(4).Infof("==========create service: %s,  %+v \n", namespace, service)
 	if controllerRef != nil {
 		service.OwnerReferences = append(service.OwnerReferences, *controllerRef)
-	}	
+	}
 
 	if _, err := qjrService.clients.AppsV1beta1().Deployments(namespace).Create(service); err != nil {
 		return err

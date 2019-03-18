@@ -21,6 +21,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/kubernetes"
 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
 	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
@@ -30,6 +31,7 @@ type XQueueJobAgent struct{
 		AgentId			string
 		DeploymentName	string
 		queuejobclients			*clientset.Clientset
+		deploymentclients    *kubernetes.Clientset				// for the upate of aggr resouces
 		AggrResources *schedulerapi.Resource
 }
 
@@ -46,6 +48,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
+		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
 		AggrResources: schedulerapi.EmptyResource(),
 	}
 	return qa
@@ -58,5 +61,6 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
+	// qa.deploymentclients.AppsV1beta1().Deployments(name).Create(service)
 	return nil
 }
