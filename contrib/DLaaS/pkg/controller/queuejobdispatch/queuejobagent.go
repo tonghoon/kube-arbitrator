@@ -17,7 +17,6 @@ limitations under the License.
 package queuejobdispatch
 
 import (
-	"fmt"
 	"strings"
 	"github.com/golang/glog"
 
