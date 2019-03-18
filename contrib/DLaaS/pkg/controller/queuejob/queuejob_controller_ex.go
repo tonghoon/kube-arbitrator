@@ -425,7 +425,7 @@ func (qjm *XController) ScheduleNext() {
 	var resources *schedulerapi.Resource
 	if qjm.isDispatcher {
 		for agentId, xqueueAgent:= range qjm.agentMap {
-			resources = xqueueAgent.AggrResouces
+			resources = xqueueAgent.AggrResources
 			if aggqj.LessEqual(resources) {
 				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
 				if e != nil {

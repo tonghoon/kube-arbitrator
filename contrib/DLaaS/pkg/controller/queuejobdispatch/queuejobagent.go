@@ -30,7 +30,7 @@ type XQueueJobAgent struct{
 		AgentId			string
 		DeploymentName	string
 		queuejobclients			*clientset.Clientset
-		AggrResouces *schedulerapi.Resource
+		AggrResources *schedulerapi.Resource
 }
 
 func NewXQueueJobAgent(config string) *XQueueJobAgent {
@@ -53,11 +53,10 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
-	queuejobclients.Create(cqj)
+	qa.queuejobclients.Create(cqj)
 	return
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
-
 	return nil
 }
