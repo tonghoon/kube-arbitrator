@@ -46,15 +46,18 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
+		AggrResources: schedulerapi.EmptyResource(),
 	}
 	return qa
 }
 
-func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
+func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
-	return nil
+	queuejobclients.Create(cqj)
+	return
 }
 
-// func (qa *XQueueJobAgent) UpdateAggrResources() error {
-// 	return nil
-// }
+func (qa *XQueueJobAgent) UpdateAggrResources() error {
+
+	return nil
+}
