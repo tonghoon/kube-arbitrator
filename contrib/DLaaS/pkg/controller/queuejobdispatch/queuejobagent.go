@@ -40,7 +40,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	agent_config, err:=clientcmd.BuildConfigFromFlags("", configStrings[0])
+	agent_config, err:=clientcmd.BuildConfigFromFlags("9.12.234.101", "/root/.kube/config_101")
 	if err!=nil {
 		return nil
 	}
@@ -61,6 +61,6 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
-	// qa.deploymentclients.AppsV1beta1().Deployments(name).Create(service)
+	// qa.deploymentclients.AppsV1beta1().Deployments(name).Get(service)
 	return nil
 }
