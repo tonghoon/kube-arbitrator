@@ -267,7 +267,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	}
 
 	//create (empty) dispatchMap
-	cc.dispatchStore=map[string]string{}
+	cc.dispatchMap=map[string]string{}
 
 	return cc
 }
@@ -774,7 +774,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// 	}
 		// }
 
-		obj:=cc.dispatchStore[GetQueueJobKey(qj)]
+		obj:=cc.dispatchMap[GetQueueJobKey(qj)]
 		// if exi {
 		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
 		// } else {
