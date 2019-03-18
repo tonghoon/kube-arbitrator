@@ -422,7 +422,11 @@ func (qjm *XController) ScheduleNext() {
 	// Get resouce requirement of the queue-job
 	aggqj := qjm.GetAggregatedResources(qj)
 
-	// if (qjm.isDispatcher) {
+	if (qjm.isDispatcher) {
+		resouces := qjm.GetAggregatedResources(qj)
+	} else {
+		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+	}
 	// 	// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
 	// 	for agentID, xqueueAgent:= range qjm.agentMap {
 	// 		resouces := xqueueAgent.aggrResouces
