@@ -20,6 +20,7 @@ import (
 	"strings"
 	"k8s.io/client-go/tools/clientcmd"
 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
+	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
 	// schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 )
 
@@ -45,7 +46,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) error {
-	
+
 	return nil
 }
 
