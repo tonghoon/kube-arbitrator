@@ -425,7 +425,7 @@ func (qjm *XController) ScheduleNext() {
 	var resources *schedulerapi.Resource
 	if qjm.isDispatcher {
 		for agentId, xqueueAgent:= range qjm.agentMap {
-			resouces = xqueueAgent.AggrResouces
+			resources = xqueueAgent.AggrResouces
 			if aggqj.LessEqual(resources) {
 				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
 				if e != nil {
@@ -437,8 +437,8 @@ func (qjm *XController) ScheduleNext() {
 														glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
 																		qj.Namespace, qj.Name, err)
 				}
-				queuejobKey,err:=queueJobKey(qj)
-				qjm.dispatchMap[queuejobKey]=agentId
+				queueJobKey,err:=GetQueueJobKey(qj)
+				qjm.dispatchMap[queueJobKey]=agentId
 				return
 			}
 		}
