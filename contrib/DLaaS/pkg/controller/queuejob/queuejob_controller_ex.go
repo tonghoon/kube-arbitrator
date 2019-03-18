@@ -114,8 +114,8 @@ type XController struct {
 	// Agent map: agentID -> XQueueJobAgent
 	agentMap map[string]*queuejobdispatch.XQueueJobAgent
 
-	// Store for XQueueJob -> XQueueJobAgent
-	dispatchStore *cache.Store
+	// Map for XQueueJob -> XQueueJobAgent
+	dispatchMap map[string]string
 }
 
 type XQueueJobAndAgent struct{
@@ -267,7 +267,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	}
 
 	//create (empty) dispatchMap
-	cc.dispatchStore=cache.NewStore(getQueueJobAndAgentKey)
+	cc.dispatchStore=map[string]string{}
 
 	return cc
 }
@@ -774,7 +774,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// 	}
 		// }
 
-		obj, exi, err:=cc.dispatchStore.GetBykey(GetQueueJobKey(qj))
+		obj:=cc.dispatchStore[GetQueueJobKey(qj)]
 		// if exi {
 		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
 		// } else {
