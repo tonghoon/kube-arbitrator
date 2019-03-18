@@ -55,7 +55,7 @@ import (
 	informersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion/v1"
 	listersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/listers/controller/v1"
 
-	queuejobdispatch "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/queuejobdispatch"
+	queuejobdispatch "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/"
 
 )
 
@@ -146,16 +146,16 @@ func RegisterAllQueueJobResourceTypes(regs *queuejobresources.RegisteredResource
 	resstatefulset.Register(regs)
 }
 
-func getQueueJobAgentKey(obj interface{}) (string, error) {
+func GetQueueJobAgentKey(obj interface{}) (string, error) {
 	qa, ok := obj.(*queuejobdispatch.XQueueJobAgent)
 	if !ok {
 		return "", fmt.Errorf("not a XQueueAgent")
 	}
-	return fmt.Sprintf("%s;%s", qa.agentId, qa.deploymentName), nil
+	return fmt.Sprintf("%s;%s", qa.AgentId, qa.DeploymentName), nil
 }
 
 
-func getQueueJobKey(obj interface{}) (string, error) {
+func GetQueueJobKey(obj interface{}) (string, error) {
 	qj, ok := obj.(*arbv1.XQueueJob)
 	if !ok {
 		return "", fmt.Errorf("not a XQueueJob")
@@ -170,9 +170,9 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 		config:      config,
 		clients:     kubernetes.NewForConfigOrDie(config),
 		arbclients:  clientset.NewForConfigOrDie(config),
-		eventQueue:  cache.NewFIFO(getQueueJobKey),
-		initQueue:   cache.NewFIFO(getQueueJobKey),
-		updateQueue: cache.NewFIFO(getQueueJobKey),
+		eventQueue:  cache.NewFIFO(GetQueueJobKey),
+		initQueue:   cache.NewFIFO(GetQueueJobKey),
+		updateQueue: cache.NewFIFO(GetQueueJobKey),
 		qjqueue:	  NewSchedulingQueue(),
 		cache:		  schedulercache.New(config, schedulerName),
 	}
@@ -774,7 +774,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// 	}
 		// }
 
-		obj, exi, err:=cc.dispatchStore.GetBykey(getQueueJobKey(qj))
+		obj, exi, err:=cc.dispatchStore.GetBykey(GetQueueJobKey(qj))
 		// if exi {
 		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
 		// } else {

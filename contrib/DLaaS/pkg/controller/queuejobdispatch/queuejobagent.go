@@ -24,8 +24,8 @@ import (
 )
 
 type XQueueJobAgent struct{
-		agentId			string
-		deploymentName	string
+		AgentId			string
+		DeploymentName	string
 		clients			*clientset.Clientset
 		// aggrResouces *schedulerapi.Resource
 }
@@ -37,8 +37,8 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	}
 	agent_config, _:=clientcmd.BuildConfigFromFlags("", configStrings[0])
 	qa := &XQueueJobAgent{
-		agentId:	configStrings[0],
-		deploymentName: configStrings[1],
+		AgentId:	configStrings[0],
+		DeploymentName: configStrings[1],
 		clients:	clientset.NewForConfigOrDie(agent_config),
 	}
 	return qa
