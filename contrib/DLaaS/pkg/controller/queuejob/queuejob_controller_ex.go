@@ -437,7 +437,7 @@ func (qjm *XController) ScheduleNext() {
 														glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
 																		qj.Namespace, qj.Name, err)
 				}
-				queueJobKey,err:=GetQueueJobKey(qj)
+				queueJobKey,_:=GetQueueJobKey(qj)
 				qjm.dispatchMap[queueJobKey]=agentId
 				return
 			}
