@@ -718,6 +718,8 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			}
 		}
 
+
+
 		for _, ar := range qj.Spec.AggrResources.Items {
 			err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
 			if err00 != nil {
@@ -747,14 +749,9 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			}
 			accessor.SetFinalizers(nil)
 
-			// we delete the job from the queue if it is there
 			cc.qjqueue.Delete(qj)
 
 			return nil
-			//var result arbv1.XQueueJob
-			//return cc.arbclients.Put().
-			//	Namespace(qj.Namespace).Resource(arbv1.QueueJobPlural).
-			//	Name(qj.Name).Body(qj).Do().Into(&result)
 		}
 
 		glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
@@ -827,21 +824,24 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 //Cleanup function
 func (cc *XController) Cleanup(queuejob *arbv1.XQueueJob) error {
 	glog.Infof("Calling cleanup for XQueueJob %s \n", queuejob.Name)
-	if queuejob.Spec.AggrResources.Items != nil {
-		// we call clean-up for each controller
-		for _, ar := range queuejob.Spec.AggrResources.Items {
-			cc.qjobResControls[ar.Type].Cleanup(queuejob, &ar)
+
+	if !cc.isDispatcher {
+		if queuejob.Spec.AggrResources.Items != nil {
+			// we call clean-up for each controller
+			for _, ar := range queuejob.Spec.AggrResources.Items {
+				cc.qjobResControls[ar.Type].Cleanup(queuejob, &ar)
+			}
 		}
 	}
 
 	old_flag := queuejob.Status.CanRun
-        queuejob.Status = arbv1.XQueueJobStatus{
+  queuejob.Status = arbv1.XQueueJobStatus{
                 Pending:      0,
                 Running:      0,
                 Succeeded:    0,
                 Failed:       0,
                 MinAvailable: int32(queuejob.Spec.SchedSpec.MinAvailable),
-        }
+  }
 	queuejob.Status.CanRun = old_flag
 
 	return nil
