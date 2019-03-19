@@ -176,6 +176,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 		qjqueue:	  NewSchedulingQueue(),
 		cache:		  schedulercache.New(config, schedulerName),
 	}
+	glog.Infof("test:%s\n",agentconfigs)
 
 	queueJobClient, _, err := clients.NewClient(cc.config)
 	if err != nil {
