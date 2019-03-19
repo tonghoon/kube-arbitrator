@@ -34,16 +34,15 @@ func buildConfig(master, kubeconfig string) (*rest.Config, error) {
 }
 
 func Run(opt *options.ServerOption) error {
-	config, _ := buildConfig(opt.Master, opt.Kubeconfig)
-	// config, err := buildConfig(opt.Master, opt.Kubeconfig)
-	// if err != nil {
-	// // 	return err
-	// }
+	config, err := buildConfig(opt.Master, opt.Kubeconfig)
+	if err != nil {
+		return err
+	}
 
 	neverStop := make(chan struct{})
 
-	// queuejobctrl := queuejob.NewQueueJobController(config)
-	// queuejobctrl.Run(neverStop)
+	queuejobctrl := queuejob.NewQueueJobController(config)
+	queuejobctrl.Run(neverStop)
 
 	xqueuejobctrl := queuejob.NewXQueueJobController(config, opt.SchedulerName, opt.Dispatcher, opt.AgentConfigs)
 	xqueuejobctrl.Run(neverStop)
