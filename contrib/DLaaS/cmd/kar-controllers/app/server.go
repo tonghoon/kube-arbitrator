@@ -34,9 +34,10 @@ func buildConfig(master, kubeconfig string) (*rest.Config, error) {
 }
 
 func Run(opt *options.ServerOption) error {
-	config, err := buildConfig(opt.Master, opt.Kubeconfig)
+	config, _ := buildConfig(opt.Master, opt.Kubeconfig)
+	// config, err := buildConfig(opt.Master, opt.Kubeconfig)
 	// if err != nil {
-	// 	return err
+	// // 	return err
 	// }
 
 	neverStop := make(chan struct{})
