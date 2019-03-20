@@ -56,14 +56,16 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 		// AggrResources: schedulerapi.EmptyResource(),
 	}
 	if qa.queuejobclients==nil {
-		glog.Infof("[Agnet] Cannot Create Client")
+		glog.Infof("[Agnet] Cannot Create Client\n")
+	} else {
+		glog.Infof("[Agnet] Create Client Suceessfully\n")
 	}
 	return qa
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
-	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
-	// qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
+	glog.Infof("Create XQJ: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
+	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
 	return
 }
 

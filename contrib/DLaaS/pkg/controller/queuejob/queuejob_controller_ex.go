@@ -799,6 +799,9 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 
 		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
 			qj.Status.State =  arbv1.QueueJobStateActive
+			queuejobKey, _:=GetQueueJobKey(qj)
+			obj:=cc.dispatchMap[queuejobKey]
+			cc.agentMap[obj].CreateXQueueJob(qj)
 		}
 
 		// if qj.Spec.AggrResources.Items != nil {
@@ -812,9 +815,6 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		// 	}
 		// }
 
-		queuejobKey, _:=GetQueueJobKey(qj)
-		obj:=cc.dispatchMap[queuejobKey]
-		cc.agentMap[obj].CreateXQueueJob(qj)
 
 
 		// for _, ar := range qj.Spec.AggrResources.Items {
