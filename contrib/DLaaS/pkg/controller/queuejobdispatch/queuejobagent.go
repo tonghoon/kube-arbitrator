@@ -63,7 +63,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
-	log.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
+	glog.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
 	old_canrun:=cqj.Status.CanRun
 	old_state:=cqj.Status.State
 	cqj.Status.CanRun = false
