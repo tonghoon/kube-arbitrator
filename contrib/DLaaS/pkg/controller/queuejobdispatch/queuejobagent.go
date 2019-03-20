@@ -25,6 +25,8 @@ import (
 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
 	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type XQueueJobAgent struct{
@@ -74,7 +76,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	cqj.Status.CanRun = old_canrun
 	cqj.Status.State =  old_state
 
-	pods, err := deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
+	pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	if err != nil {
 		glog.Infof("[Agent] Cannot Access Agent================\n")
 	}
