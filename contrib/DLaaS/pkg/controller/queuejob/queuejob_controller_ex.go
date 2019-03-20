@@ -412,7 +412,7 @@ func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) stri
 	for agentId, xqueueAgent:= range qjm.agentMap {
 		resources := xqueueAgent.AggrResources
 		return agentId			// must be deleted
-		if aggqj.LessEqual(resources) {
+		if qjAggrResources.LessEqual(resources) {
 			return agentId
 		}
 	}
