@@ -51,7 +51,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
-		// deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
+		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
 		// AggrResources: schedulerapi.EmptyResource(),
 	}
 	if qa.queuejobclients==nil {
@@ -73,6 +73,13 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
 	cqj.Status.CanRun = old_canrun
 	cqj.Status.State =  old_state
+
+	pods, err := deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
+	if err != nil {
+		glog.Infof("[Agent] Cannot Access Agent================\n")
+	}
+	glog.Infof("There are %d pods in the cluster\n", len(pods.Items))
+
 	return
 }
 
