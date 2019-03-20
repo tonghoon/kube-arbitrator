@@ -261,8 +261,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	cc.isDispatcher=isDispatcher
 	if isDispatcher {
 		glog.Infof("[Dispatcher] Dispatcher mode")
-	}
-	else {
+	}	else {
 		glog.Infof("[Dispachter] Agent mode")
 	}
 
