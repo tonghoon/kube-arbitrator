@@ -266,7 +266,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	}
 
 	//create agents and agentMap
-	if isDispachter {
+	if isDispatcher {
 		glog.Infof("[Dispacther] Agent conf:%s\n", agentconfigs)
 	}
 	cc.agentMap=map[string]*queuejobdispatch.XQueueJobAgent{}
