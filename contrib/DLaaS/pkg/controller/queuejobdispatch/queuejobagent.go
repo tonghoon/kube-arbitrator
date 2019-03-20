@@ -36,11 +36,11 @@ type XQueueJobAgent struct{
 }
 
 func NewXQueueJobAgent(config string) *XQueueJobAgent {
-	configStrings:=strings.Split(config, ";")
+	configStrings:=strings.Split(config, ":")
 	if len(configStrings)<2 {
 		return nil
 	}
-	glog.Infof("[Agnet] Agent %s;%s Created\n", configStrings[0], configStrings[1])
+	glog.Infof("[Agnet] Agent %s:%s Created\n", configStrings[0], configStrings[1])
 
 	// agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/.kube/config_101")
 	// if err!=nil {

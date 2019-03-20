@@ -434,7 +434,7 @@ func (qjm *XController) ScheduleNext() {
 	if qjm.isDispatcher {
 		for agentId, xqueueAgent:= range qjm.agentMap {
 			resources = xqueueAgent.AggrResources
-			if aggqj.LessEqual(resources) {
+			// if aggqj.LessEqual(resources) {
 				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
 				if e != nil {
 					return
@@ -448,7 +448,7 @@ func (qjm *XController) ScheduleNext() {
 				queueJobKey,_:=GetQueueJobKey(qj)
 				qjm.dispatchMap[queueJobKey]=agentId
 				return
-			}
+			// }
 		}
 		go qjm.backoff(qj)
 	} else {
