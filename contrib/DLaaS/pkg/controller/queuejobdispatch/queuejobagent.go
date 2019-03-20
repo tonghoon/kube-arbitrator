@@ -40,7 +40,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	agent_config, err:=clientcmd.BuildConfigFromFlags("9.12.234.101", "/root/.kube/config_101")
+	agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/.kube/config_101")
 	if err!=nil {
 		return nil
 	}
