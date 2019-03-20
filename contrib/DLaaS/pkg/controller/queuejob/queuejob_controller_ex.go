@@ -259,8 +259,17 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 
 	// Set dispatcher mode or agent mode
 	cc.isDispatcher=isDispatcher
+	if isDispatcher {
+		glog.Infof("[Dispatcher] Dispatcher mode")
+	}
+	else {
+		glog.Infof("[Dispachter] Agent mode")
+	}
 
 	//create agents and agentMap
+	if isDispachter {
+		glog.Infof("[Dispacther] Agent conf:%s\n", agentconfigs)
+	}
 	cc.agentMap=map[string]*queuejobdispatch.XQueueJobAgent{}
 	for _, agentconfig := range strings.Split(agentconfigs,",") {
 		cc.agentMap[agentconfig]=queuejobdispatch.NewXQueueJobAgent(agentconfig)

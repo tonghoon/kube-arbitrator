@@ -40,23 +40,26 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/.kube/config_101")
-	if err!=nil {
-		return nil
-	}
+	glog.Infof("[Agnet] Agent %s;%s Created\n", configStrings[0], configStrings[1])
+
+	// agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/.kube/config_101")
+	// if err!=nil {
+	// 	return nil
+	// }
+
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
-		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
-		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
-		AggrResources: schedulerapi.EmptyResource(),
+		// queuejobclients:	clientset.NewForConfigOrDie(agent_config),
+		// deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
+		// AggrResources: schedulerapi.EmptyResource(),
 	}
 	return qa
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("Create XQJ: %s in Agent %s", cqj.Name, qa.AgentId)
-	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
+	// qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
 	return
 }
 
