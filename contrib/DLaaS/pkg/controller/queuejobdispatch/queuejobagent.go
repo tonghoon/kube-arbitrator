@@ -47,7 +47,6 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 		glog.Infof("[Agent] Cannot crate client\n")
 		return nil
 	}
-
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
@@ -64,8 +63,16 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
+	log.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
+	old_canrun:=cqj.Status.CanRun
+	old_state:=cqj.Status.State
+	cqj.Status.CanRun = false
+	cqj.Status.State =  arbv1.QueueJobStateEnqueued
+
 	glog.Infof("Create XQJ: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
+	cqj.Status.CanRun = old_canrun
+	cqj.Status.State =  old_state
 	return
 }
 
