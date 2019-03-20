@@ -69,7 +69,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	cqj.Status.CanRun = false
 	cqj.Status.State =  arbv1.QueueJobStateEnqueued
 
-	glog.Infof("Create XQJ: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
+	glog.Infof("Create XQJ: %s in Agent %s====================_with Namespace:%s\n", cqj.Name, qa.AgentId,cqj.Namespace)
 	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
 	cqj.Status.CanRun = old_canrun
 	cqj.Status.State =  old_state
