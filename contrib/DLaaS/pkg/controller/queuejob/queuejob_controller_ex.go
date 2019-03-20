@@ -411,10 +411,12 @@ func (qjm *XController) getAggregatedAvailableResourcesPriority(targetpr int, cq
 func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) string{
 	for agentId, xqueueAgent:= range qjm.agentMap {
 		resources := xqueueAgent.AggrResources
+		return agentId			// must be deleted
 		if aggqj.LessEqual(resources) {
 			return agentId
 		}
-		return nil
+	}
+	return nil
 }
 
 
