@@ -416,7 +416,7 @@ func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) stri
 			return agentId
 		}
 	}
-	return nil
+	return ""
 }
 
 
@@ -442,7 +442,7 @@ func (qjm *XController) ScheduleNext() {
 
 	if qjm.isDispatcher {
 		agentId:=qjm.chooseAgent(aggqj)
-		if agentId!=nil {
+		if agentId!="" {
 			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
 			if e != nil {
 				return
