@@ -42,17 +42,21 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	}
 	glog.Infof("[Agnet] Agent %s:%s Created\n", configStrings[0], configStrings[1])
 
-	// agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/.kube/config_101")
-	// if err!=nil {
-	// 	return nil
-	// }
+	agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/agent101config")
+	if err!=nil {
+		glog.Infof("[Agent] Cannot crate client\n")
+		return nil
+	}
 
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
-		// queuejobclients:	clientset.NewForConfigOrDie(agent_config),
+		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
 		// deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
 		// AggrResources: schedulerapi.EmptyResource(),
+	}
+	if qa.queuejobclients==nil {
+		glog.Infof("[Agnet] Cannot Create Client")
 	}
 	return qa
 }

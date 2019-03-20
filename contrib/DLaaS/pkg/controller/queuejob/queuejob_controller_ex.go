@@ -408,9 +408,17 @@ func (qjm *XController) getAggregatedAvailableResourcesPriority(targetpr int, cq
 	return r
 }
 
-// Thread to find queue-job(QJ) for next schedule:
-// 1) get next QJ from the queue and its (agrregated) resource requirement
-// 2)
+func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) string{
+	for agentId, xqueueAgent:= range qjm.agentMap {
+		resources := xqueueAgent.AggrResources
+		if aggqj.LessEqual(resources) {
+			return agentId
+		}
+		return nil
+}
+
+
+// Thread to find queue-job(QJ) for next schedule
 func (qjm *XController) ScheduleNext() {
 	// get next QJ from the queue
 	// check if we have enough compute resources for it
@@ -430,29 +438,32 @@ func (qjm *XController) ScheduleNext() {
 	// Get resouce requirement of the queue-job
 	aggqj := qjm.GetAggregatedResources(qj)
 
-	var resources *schedulerapi.Resource
 	if qjm.isDispatcher {
-		for agentId, xqueueAgent:= range qjm.agentMap {
-			resources = xqueueAgent.AggrResources
-			// if aggqj.LessEqual(resources) {
-				newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
-				if e != nil {
-					return
-				}
-				newjob.Status.CanRun = true
-				qj.Status.CanRun = true
-				if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-														glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-																		qj.Namespace, qj.Name, err)
-				}
-				queueJobKey,_:=GetQueueJobKey(qj)
-				qjm.dispatchMap[queueJobKey]=agentId
+		agentId:=qjm.chooseAgent(aggqj)
+		if agentId!=nil {
+			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
+			if e != nil {
 				return
+			}
+			newjob.Status.CanRun = true
+			qj.Status.CanRun = true
+			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
+													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
+																	qj.Namespace, qj.Name, err)
+			}
+			queueJobKey,_:=GetQueueJobKey(qj)
+			qjm.dispatchMap[queueJobKey]=agentId
+			return
+		} else {
+			go qjm.backoff(qj)
+		}
+
+
 			// }
 		}
-		go qjm.backoff(qj)
+
 	} else {
-		resources = qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
+		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
 		if aggqj.LessEqual(resources) {
@@ -805,11 +816,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		queuejobKey, _:=GetQueueJobKey(qj)
 		obj:=cc.dispatchMap[queuejobKey]
 		cc.agentMap[obj].CreateXQueueJob(qj)
-		// if exi {
-		// 	agentMap[obj.(string)].CreateXQueueJob(qj)
-		// } else {
-		// 	return err
-		// }
+
 
 		// for _, ar := range qj.Spec.AggrResources.Items {
 		// 	err00 := cc.qjobResControls[ar.Type].SyncQueueJob(qj, &ar)
