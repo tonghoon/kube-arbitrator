@@ -126,10 +126,10 @@ type XQueueJobStatus struct {
 	// The minimal available resources to run for this QueueJob (is this different from the MinAvailable from JobStatus)
 	// +optional
 	MinAvailable int32 `json:"template,omitempty" protobuf:"bytes,4,opt,name=template"`
-	
+
 	//Can run?
 	CanRun bool `json:"canrun,omitempty" protobuf:"bytes,1,opt,name=canrun"`
-	
+
 	//State - Running, Queued, Deleted ?
 	State             XQueueJobState `json:"state,omitempty"`
 
@@ -145,4 +145,3 @@ const (
 	QueueJobStateDeleted  XQueueJobState = "Deleted"
 	QueueJobStateFailed   XQueueJobState = "Failed"
 )
-

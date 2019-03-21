@@ -66,15 +66,13 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
-	old_canrun:=cqj.Status.CanRun
-	old_state:=cqj.Status.State
-	cqj.Status.CanRun = false
-	cqj.Status.State =  arbv1.QueueJobStateEnqueued
 
+	copyed_qj:=cqj.DeepCopy()
+	copyed_qj.Status.CanRun=false
+	copyed_qj.Status.State=QueueJobStateEnqueued
+	
 	glog.Infof("Create XQJ: %s in Agent %s====================_with Namespace:%s\n", cqj.Name, qa.AgentId,cqj.Namespace)
-	qa.queuejobclients.ArbV1().XQueueJobs(cqj.Namespace).Create(cqj)
-	cqj.Status.CanRun = old_canrun
-	cqj.Status.State =  old_state
+	qa.queuejobclients.ArbV1().XQueueJobs(copyed_qj.Namespace).Create(copyed_qj)
 
 	pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	if err != nil {
