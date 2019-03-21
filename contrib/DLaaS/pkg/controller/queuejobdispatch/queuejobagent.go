@@ -69,8 +69,8 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 
 	copyed_qj:=cqj.DeepCopy()
 	copyed_qj.Status.CanRun=false
-	copyed_qj.Status.State=QueueJobStateEnqueued
-	
+	copyed_qj.Status.State=arbv1.QueueJobStateEnqueued
+
 	glog.Infof("Create XQJ: %s in Agent %s====================_with Namespace:%s\n", cqj.Name, qa.AgentId,cqj.Namespace)
 	qa.queuejobclients.ArbV1().XQueueJobs(copyed_qj.Namespace).Create(copyed_qj)
 
