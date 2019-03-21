@@ -227,9 +227,9 @@ func (qjrPod *QueueJobResPod) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) er
         }
 
 	running := int32(queuejobresources.FilterPods(pods, v1.PodRunning))
-        pending := int32(queuejobresources.FilterPods(pods, v1.PodPending))
-        succeeded := int32(queuejobresources.FilterPods(pods, v1.PodSucceeded))
-        failed := int32(queuejobresources.FilterPods(pods, v1.PodFailed))
+  pending := int32(queuejobresources.FilterPods(pods, v1.PodPending))
+  succeeded := int32(queuejobresources.FilterPods(pods, v1.PodSucceeded))
+  failed := int32(queuejobresources.FilterPods(pods, v1.PodFailed))
 
         glog.Infof("There are %d pods of QueueJob %s:  pending %d, running %d, succeeded %d, failed %d",
                 len(pods), queuejob.Name,  pending, running, succeeded, failed)

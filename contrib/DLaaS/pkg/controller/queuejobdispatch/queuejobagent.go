@@ -64,6 +64,13 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	return qa
 }
 
+func (qa *XQueueJobAgent) DeleteXQueueJob(cqj *arbv1.XQueueJob) {
+	qj_temp:=cqj.DeepCopy()
+	glog.Infof("[Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.Kind)
+	qa.queuejobclients.ArbV1().XQueueJobs(qj_temp.Namespace).Delete(qj_temp.Name,  &metav1.DeleteOptions{})
+	return
+}
+
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
 
@@ -75,7 +82,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	}
 	glog.Infof("[Agent] XQJ resourceVersion cleaned--Name:%s, Kind:%s\n", agent_qj.Name, agent_qj.Kind)
 	glog.Infof("Create XQJ: %s in Agent %s====================\n", agent_qj.Name, qa.AgentId)
-	// qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(agent_qj)
+	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(agent_qj)
 
 	// pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	// if err != nil {

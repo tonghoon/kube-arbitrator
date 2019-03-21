@@ -305,23 +305,24 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 		return qjobs
 	}
 
-	for _, value := range queueJobs {
-		replicas := value.Spec.SchedSpec.MinAvailable
+	if !qjm.isDispatcher {		// Agent Mode
+		for _, value := range queueJobs {
+			replicas := value.Spec.SchedSpec.MinAvailable
 
-		if int(value.Status.Succeeded) == replicas {
-			glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
-			qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{
-	        	})
-			continue
-		}
-		if value.Status.State == arbv1.QueueJobStateEnqueued {
-			continue
-		}
-		glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
-		if int(value.Status.Running) < replicas {
-			glog.Infof("I need to preempt job %s --------------------------------------", value.Name)
-			glog.Infof("[Tonghoon] I need to preempt job %s --------------------------------------", value.Name)
-			qjobs = append(qjobs, value)
+			if int(value.Status.Succeeded) == replicas {
+				glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
+				qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{})
+				continue
+			}
+			if value.Status.State == arbv1.QueueJobStateEnqueued {
+				continue
+			}
+			glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
+			if int(value.Status.Running) < replicas {
+				glog.Infof("I need to preempt job %s --------------------------------------", value.Name)
+				glog.Infof("[Tonghoon] I need to preempt job %s --------------------------------------", value.Name)
+				qjobs = append(qjobs, value)
+			}
 		}
 	}
 	return qjobs
@@ -523,8 +524,6 @@ func (qjm *XController) backoff(q *arbv1.XQueueJob) {
 	time.Sleep(initialGetBackoff)
 	qjm.qjqueue.AddIfNotPresent(q)
 }
-
-
 
 // Run start XQueueJob Controller
 func (cc *XController) Run(stopCh chan struct{}) {
@@ -803,7 +802,9 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			qj.Status.State =  arbv1.QueueJobStateActive
 			queuejobKey, _:=GetQueueJobKey(qj)
 			obj:=cc.dispatchMap[queuejobKey]
-			cc.agentMap[obj].CreateXQueueJob(qj)
+			if obj!=nil {
+				cc.agentMap[obj].CreateXQueueJob(qj)
+			}
 		}
 
 		// if qj.Spec.AggrResources.Items != nil {
@@ -846,6 +847,14 @@ func (cc *XController) Cleanup(queuejob *arbv1.XQueueJob) error {
 			// we call clean-up for each controller
 			for _, ar := range queuejob.Spec.AggrResources.Items {
 				cc.qjobResControls[ar.Type].Cleanup(queuejob, &ar)
+			}
+		}
+	} else {
+		if queuejob.Status.CanRun && queuejob.Status.State == arbv1.QueueJobStateActive {
+			queuejobKey, _:=GetQueueJobKey(queuejob)
+			obj:=cc.dispatchMap[queuejobKey]
+			if obj!=nil {
+				cc.agentMap[obj].DeleteXQueueJob(queuejob)
 			}
 		}
 	}
