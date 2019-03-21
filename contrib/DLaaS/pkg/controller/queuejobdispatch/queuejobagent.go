@@ -69,28 +69,26 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 
 
 	qj_temp:=cqj.DeepCopy()
-	agent_qj:=arbv1.XQueueJob{
+	agent_qj:=&arbv1.XQueueJob{
 		TypeMeta: qj_temp.TypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: qj_temp.Name,},
 		Spec: qj_temp.Spec,
 	}
-	glog.Infof("[Agent] XQJ resourceVersion cleaned")
+	glog.Infof("[Agent] XQJ resourceVersion cleaned--Name:%s, Kind:%s\n", agent_qj.Name, agent_qj.Kind)
 	// em:=metav1.ObjectMeta{Name: cqj.Name,}
 	// em.DeepCopyInto(&copyed_qj.ObjectMeta)
 	// copyed_qj.Status.CanRun=false
 	// copyed_qj.Status.State=arbv1.QueueJobStateEnqueued
-
-	glog.Infof("Create XQJ: %s in Agent %s====================_with Namespace:%s\n", agent_qj.Name, qa.AgentId)
-	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(&agent_qj)
-
+	glog.Infof("Create XQJ: %s in Agent %s====================\n", agent_qj.Name, qa.AgentId)
+	qa.queuejobclients.ArbV1().XQueueJobs(qj_temp.Namespace).Create(agent_qj)
 	pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	if err != nil {
 		glog.Infof("[Agent] Cannot Access Agent================\n")
 	}
-	glog.Infof("There are %d pods in the cluster\n", len(pods.Items))
-	for _, pod := range pods.Items {
-		glog.Infof("[Agent] Pod Name=%s\n",pod.Name)
-	}
+	// glog.Infof("There are %d pods in the cluster\n", len(pods.Items))
+	// for _, pod := range pods.Items {
+	// 	glog.Infof("[Agent] Pod Name=%s\n",pod.Name)
+	// }
 
 
 	return
