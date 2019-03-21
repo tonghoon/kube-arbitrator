@@ -801,8 +801,9 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
 			qj.Status.State =  arbv1.QueueJobStateActive
 			queuejobKey, _:=GetQueueJobKey(qj)
-			obj:=cc.dispatchMap[queuejobKey]
-			if obj!=nil {
+			// obj:=cc.dispatchMap[queuejobKey]
+			// if obj!=nil {
+			if obj, ok:=cc.dispatchMap[queuejobKey]; ok {
 				cc.agentMap[obj].CreateXQueueJob(qj)
 			}
 		}
@@ -852,8 +853,7 @@ func (cc *XController) Cleanup(queuejob *arbv1.XQueueJob) error {
 	} else {
 		if queuejob.Status.CanRun && queuejob.Status.State == arbv1.QueueJobStateActive {
 			queuejobKey, _:=GetQueueJobKey(queuejob)
-			obj:=cc.dispatchMap[queuejobKey]
-			if obj!=nil {
+			if obj, ok:=cc.dispatchMap[queuejobKey]; ok {
 				cc.agentMap[obj].DeleteXQueueJob(queuejob)
 			}
 		}
