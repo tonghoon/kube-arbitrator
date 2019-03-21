@@ -68,6 +68,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	glog.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
 
 	copyed_qj:=cqj.DeepCopy()
+	metav1.ObjectMeta{Name: cqj.Name,}.DeepCopyInto(&copyed_qj.ObjectMeta)
 	copyed_qj.Status.CanRun=false
 	copyed_qj.Status.State=arbv1.QueueJobStateEnqueued
 
