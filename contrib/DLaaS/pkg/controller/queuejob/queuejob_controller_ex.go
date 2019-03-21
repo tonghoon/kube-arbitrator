@@ -587,7 +587,7 @@ func (cc *XController) updateQueueJob(oldObj, newObj interface{}) {
 		glog.Errorf("newObj is not XQueueJob")
 		return
 	}
-	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", qj.Name)
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", newQJ.Name)
 	cc.enqueue(newQJ)
 }
 
