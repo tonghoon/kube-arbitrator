@@ -66,7 +66,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) DeleteXQueueJob(cqj *arbv1.XQueueJob) {
 	qj_temp:=cqj.DeepCopy()
-	glog.Infof("[Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.Kind)
+	glog.Infof("[Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(qj_temp.Namespace).Delete(qj_temp.Name,  &metav1.DeleteOptions{})
 	return
 }
