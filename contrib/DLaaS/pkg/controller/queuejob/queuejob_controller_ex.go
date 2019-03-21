@@ -130,13 +130,13 @@ func NewXQueueJobAndAgent(qjKey string, qaKey string) *XQueueJobAndAgent {
 	}
 }
 
-func getQueueJobAndAgentKey(obj interface{}) (string, error) {
-	qja, ok := obj.(*XQueueJobAndAgent)
-	if !ok {
-		return "", fmt.Errorf("not a XQueueJobAndAgent")
-	}
-	return fmt.Sprintf("%s", qja.queueJobKey), nil
-}
+// func getQueueJobAndAgentKey(obj interface{}) (string, error) {
+// 	qja, ok := obj.(*XQueueJobAndAgent)
+// 	if !ok {
+// 		return "", fmt.Errorf("not a XQueueJobAndAgent")
+// 	}
+// 	return fmt.Sprintf("%s", qja.queueJobKey), nil
+// }
 
 //RegisterAllQueueJobResourceTypes - gegisters all resources
 func RegisterAllQueueJobResourceTypes(regs *queuejobresources.RegisteredResources) {
@@ -283,10 +283,11 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 func (qjm *XController) PreemptQueueJobs() {
 	qjobs := qjm.GetQueueJobsEligibleForPreemption()
 	for _, q := range qjobs {
+		glog.Infof("[Tonghoon] Change flags to Canrun=false: Preemption for Queuejob %s\n", q.Name)
 		newjob, e := qjm.queueJobLister.XQueueJobs(q.Namespace).Get(q.Name)
-                if e != nil {
-                        continue
-                }
+		if e != nil {
+			continue
+		}
 		newjob.Status.CanRun = false
 		if _, err := qjm.arbclients.ArbV1().XQueueJobs(q.Namespace).Update(newjob); err != nil {
 			glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
@@ -308,6 +309,7 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 		replicas := value.Spec.SchedSpec.MinAvailable
 
 		if int(value.Status.Succeeded) == replicas {
+			glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
 			qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{
 	        	})
 			continue
@@ -318,6 +320,7 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 		glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
 		if int(value.Status.Running) < replicas {
 			glog.Infof("I need to preempt job %s --------------------------------------", value.Name)
+			glog.Infof("[Tonghoon] I need to preempt job %s --------------------------------------", value.Name)
 			qjobs = append(qjobs, value)
 		}
 	}
@@ -553,19 +556,18 @@ func (cc *XController) Run(stopCh chan struct{}) {
 }
 
 func (qjm *XController) UpdateQueueJobs() {
-        queueJobs, err := qjm.queueJobLister.XQueueJobs("").List(labels.Everything())
-        if err != nil {
-                glog.Errorf("I return list of queueJobs %+v", err)
-                return
-        }
-
-        for _, newjob := range queueJobs {
+	queueJobs, err := qjm.queueJobLister.XQueueJobs("").List(labels.Everything())
+	if err != nil {
+		glog.Errorf("I return list of queueJobs %+v", err)
+		return
+	}
+	for _, newjob := range queueJobs {
 		qjm.enqueue(newjob)
                 //if _, err := qjm.arbclients.ArbV1().XQueueJobs(newjob.Namespace).Update(newjob); err != nil {
                 //        glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
                 //                newjob.Namespace, newjob.Name, err)
                 //}
-        }
+  }
 }
 
 func (cc *XController) addQueueJob(obj interface{}) {
@@ -574,9 +576,8 @@ func (cc *XController) addQueueJob(obj interface{}) {
 		glog.Errorf("obj is not XQueueJob")
 		return
 	}
-
 	glog.V(4).Infof("QueueJob added - info -  %+v")
-
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added\n", qj.Name)
 	cc.enqueue(qj)
 }
 
@@ -586,7 +587,7 @@ func (cc *XController) updateQueueJob(oldObj, newObj interface{}) {
 		glog.Errorf("newObj is not XQueueJob")
 		return
 	}
-
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", qj.Name)
 	cc.enqueue(newQJ)
 }
 
@@ -596,7 +597,7 @@ func (cc *XController) deleteQueueJob(obj interface{}) {
 		glog.Errorf("obj is not XQueueJob")
 		return
 	}
-
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: delete\n", qj.Name)
 	cc.enqueue(qj)
 }
 
@@ -617,7 +618,7 @@ func (cc *XController) worker() {
 			glog.Errorf("Un-supported type of %v", obj)
 			return nil
 		}
-
+		glog.Infof("[Tonghoon] QueueJob %s pop up from eventQueue", queuejob.Name)
 		if queuejob == nil {
 			if acc, err := meta.Accessor(obj); err != nil {
 				glog.Warningf("Failed to get XQueueJob for %v/%v", acc.GetNamespace(), acc.GetName())
@@ -669,7 +670,6 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 	defer func() {
 		glog.Infof("Finished syncing queue job %q (%v)", qj.Name, time.Now().Sub(startTime))
 	}()
-
 
 	if(!cc.isDispatcher) {
 
@@ -773,11 +773,13 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		}
 
 		glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
+		glog.Infof("[Tonghoon] I have job with name %s status %+v ", qj.Name, qj.Status)
 
 		if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
 			// if there are running resources for this job then delete them because the job was put in
 			// pending state...
 			glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
+			glog.Infof("[Tonghoon] Deleting queuejob resources because it will be preempted! %s", qj.Name)
 			err = cc.Cleanup(qj)
 			if err != nil {
 				return err
