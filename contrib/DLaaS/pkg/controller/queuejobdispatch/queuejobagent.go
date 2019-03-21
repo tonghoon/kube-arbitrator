@@ -70,7 +70,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 
 	qj_temp:=cqj.DeepCopy()
 	agent_qj:=arbv1.XQueueJob{
-		TypeMeta: qj_tmep.TypeMeta,
+		TypeMeta: qj_temp.TypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: qj_temp.Name,},
 		Spec: qj_temp.Spec,
 	}
