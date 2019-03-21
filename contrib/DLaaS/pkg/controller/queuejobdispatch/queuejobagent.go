@@ -85,7 +85,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	if err != nil {
 		glog.Infof("[Agent] Cannot Access Agent================\n")
 	}
-	// glog.Infof("There are %d pods in the cluster\n", len(pods.Items))
+	glog.Infof("There are %d pods in the cluster\n", len(pods.Items))
 	// for _, pod := range pods.Items {
 	// 	glog.Infof("[Agent] Pod Name=%s\n",pod.Name)
 	// }
