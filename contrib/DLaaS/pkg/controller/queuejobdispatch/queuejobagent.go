@@ -81,7 +81,7 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 	// copyed_qj.Status.State=arbv1.QueueJobStateEnqueued
 
 	glog.Infof("Create XQJ: %s in Agent %s====================_with Namespace:%s\n", agent_qj.Name, qa.AgentId)
-	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(*agent_qj)
+	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(&agent_qj)
 
 	pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	if err != nil {
