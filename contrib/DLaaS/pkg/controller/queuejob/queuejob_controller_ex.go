@@ -311,7 +311,8 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 
 			if int(value.Status.Succeeded) == replicas {
 				glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
-				qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{})
+				qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{
+				})
 				continue
 			}
 			if value.Status.State == arbv1.QueueJobStateEnqueued {
