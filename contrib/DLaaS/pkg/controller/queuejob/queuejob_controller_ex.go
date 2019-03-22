@@ -562,7 +562,7 @@ func (qjm *XController) UpdateQueueJobs() {
 		return
 	}
 	for _, newjob := range queueJobs {
-		glog.Infof("[Tonghoon] UpdateQueueJobs: %s\n", newjob.Name)
+		glog.Infof("[Tonghoon] UpdateQueueJobs: [%s]\n", newjob.Name)
 		qjm.enqueue(newjob)
                 //if _, err := qjm.arbclients.ArbV1().XQueueJobs(newjob.Namespace).Update(newjob); err != nil {
                 //        glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
