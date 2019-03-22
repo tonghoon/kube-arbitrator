@@ -754,6 +754,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 	}	else { // isDispatcher is True
 
 		if qj.DeletionTimestamp != nil {
+			glog.Infof("[Tonghoon] DeleteTimeStamp is Set for QueueJob: %s\n", qj.Name)
 			// cleanup resources for running job
 			err = cc.Cleanup(qj)
 			if err != nil {
@@ -851,6 +852,7 @@ func (cc *XController) Cleanup(queuejob *arbv1.XQueueJob) error {
 			}
 		}
 	} else {
+		glog.Infof("[Dispatcher] Cleanup: State=%s\n", queuejob.Status.State)
 		if queuejob.Status.CanRun && queuejob.Status.State == arbv1.QueueJobStateActive {
 			queuejobKey, _:=GetQueueJobKey(queuejob)
 			if obj, ok:=cc.dispatchMap[queuejobKey]; ok {
