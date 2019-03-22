@@ -611,7 +611,7 @@ func (cc *XController) enqueue(obj interface{}) {
 }
 
 func (cc *XController) worker() {
-	glog("[Tonghoon] Worker Started\n")
+	glog.Infof("[Tonghoon] Worker Started\n")
 	if _, err := cc.eventQueue.Pop(func(obj interface{}) error {
 		var queuejob *arbv1.XQueueJob
 		switch v := obj.(type) {
