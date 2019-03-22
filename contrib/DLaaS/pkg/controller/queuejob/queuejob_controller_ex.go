@@ -597,6 +597,9 @@ func (cc *XController) deleteQueueJob(obj interface{}) {
 		return
 	}
 	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: delete\n", qj.Name)
+	if qj.DeletionTimestamp == nil {
+		glog.Infof("[Tonghoon] DeleTimeStame is not Set\n")
+	}
 	cc.enqueue(qj)
 }
 
@@ -608,6 +611,7 @@ func (cc *XController) enqueue(obj interface{}) {
 }
 
 func (cc *XController) worker() {
+	glog("[Tonghoon] Worker Started\n")
 	if _, err := cc.eventQueue.Pop(func(obj interface{}) error {
 		var queuejob *arbv1.XQueueJob
 		switch v := obj.(type) {
