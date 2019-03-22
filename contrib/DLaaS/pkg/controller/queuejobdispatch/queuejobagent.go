@@ -19,6 +19,8 @@ package queuejobdispatch
 import (
 	"strings"
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/kubernetes"
@@ -51,16 +53,18 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	}
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
-		DeploymentName: configStrings[1],
+		// DeploymentName: configStrings[1],
+		DeploymentName: "voting-moose-kube-arbitrator",
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
 		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
-		// AggrResources: schedulerapi.EmptyResource(),
+		AggrResources: schedulerapi.EmptyResource(),
 	}
 	if qa.queuejobclients==nil {
 		glog.Infof("[Agnet] Cannot Create Client\n")
 	} else {
 		glog.Infof("[Agnet] Create Client Suceessfully\n")
 	}
+	qa.UpdateAggrResources()
 	return qa
 }
 
@@ -97,6 +101,24 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
-	// qa.deploymentclients.AppsV1beta1().Deployments(name).Get(service)
-	return nil
+    glog.Infof("[Agent] Getting aggregated resources for Agent ID: %s with Agent QueueJob Name: %s\n", qa.AgentId, qa.DeploymentName)
+
+    // Read the Agent XQJ Deployment object
+    agentXQJDeployment, getErr := qa.deploymentclients.AppsV1().Deployments("kube-system").Get(qa.DeploymentName, metav1.GetOptions{})
+    if getErr != nil {
+        glog.Infof("Failed to get deployment Agent ID: %s with Agent QueueJob Name: %s, Error: %v\n", qa.AgentId, qa.DeploymentName, getErr)
+    }
+    for key, value := range agentXQJDeployment.Labels {
+        glog.Infof("Agent QueueJob Name: %s has %s=%s: %s\n", qa.DeploymentName, key, value)
+    }
+    // qa.AggrResources=buildResource(agentXQJDeployment.Labels["available_cpu"], agentXQJDeployment.Labels["available_memory"])
+		qa.AggrResources=buildResource("999999","99999999")
+    return nil
+}
+
+func buildResource(cpu string, memory string) *schedulerapi.Resource {
+    return schedulerapi.NewResource(v1.ResourceList{
+        v1.ResourceCPU:    resource.MustParse(cpu),
+        v1.ResourceMemory: resource.MustParse(memory),
+    })
 }

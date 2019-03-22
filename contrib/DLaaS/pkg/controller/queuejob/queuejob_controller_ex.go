@@ -416,8 +416,9 @@ func (qjm *XController) getAggregatedAvailableResourcesPriority(targetpr int, cq
 func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) string{
 	for agentId, xqueueAgent:= range qjm.agentMap {
 		resources := xqueueAgent.AggrResources
-		return agentId			// must be deleted
+		// return agentId			// must be deleted
 		if qjAggrResources.LessEqual(resources) {
+			glog.Infof("[Tonghoon] Agent %s has enough resouces\n", agentId)
 			return agentId
 		}
 	}
@@ -579,7 +580,7 @@ func (cc *XController) addQueueJob(obj interface{}) {
 		return
 	}
 	glog.V(4).Infof("QueueJob added - info -  %+v")
-	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added\n", qj.Name)
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added with %d\n", qj.Name, qj.Spec.SchedSpec.MinAvailable)
 	cc.enqueue(qj)
 }
 
@@ -677,6 +678,12 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 	defer func() {
 		glog.Infof("Finished syncing queue job %q (%v)", qj.Name, time.Now().Sub(startTime))
 	}()
+
+	if qj.DeletionTimestamp == nil {
+		glog.Infof("[Tonghoon] DeletionTimestame is not set for %s=================================\n", qj.Name)
+	} else {
+		glog.Infof("[Tonghoon] DeletionTimestame IS SET for %s===================================\n", qj.Name)
+	}
 
 	if(!cc.isDispatcher) {
 
