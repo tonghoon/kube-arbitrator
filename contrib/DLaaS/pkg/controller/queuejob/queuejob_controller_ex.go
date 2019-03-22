@@ -625,7 +625,7 @@ func (cc *XController) worker() {
 			glog.Errorf("Un-supported type of %v", obj)
 			return nil
 		}
-		glog.Infof("[Tonghoon] QueueJob %s pop up from eventQueue", queuejob.Name)
+		glog.Infof("[Tonghoon] QueueJob %s pop up from eventQueue with min=$d\n", queuejob.Name, queuejob.Spec.SchedSpec.MinAvailable)
 		if queuejob == nil {
 			if acc, err := meta.Accessor(obj); err != nil {
 				glog.Warningf("Failed to get XQueueJob for %v/%v", acc.GetNamespace(), acc.GetName())
