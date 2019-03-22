@@ -555,12 +555,14 @@ func (cc *XController) Run(stopCh chan struct{}) {
 }
 
 func (qjm *XController) UpdateQueueJobs() {
+	glog.Infof("[Tonghoon] UpdateQueueJobs\n")
 	queueJobs, err := qjm.queueJobLister.XQueueJobs("").List(labels.Everything())
 	if err != nil {
 		glog.Errorf("I return list of queueJobs %+v", err)
 		return
 	}
 	for _, newjob := range queueJobs {
+		glog.Infof("[Tonghoon] UpdateQueueJobs: %s\n", newjob.Name)
 		qjm.enqueue(newjob)
                 //if _, err := qjm.arbclients.ArbV1().XQueueJobs(newjob.Namespace).Update(newjob); err != nil {
                 //        glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
@@ -604,6 +606,7 @@ func (cc *XController) deleteQueueJob(obj interface{}) {
 }
 
 func (cc *XController) enqueue(obj interface{}) {
+	glog.Infof("[Tonghoon] Job is Enqueued!!!!\n")
 	err := cc.eventQueue.Add(obj)
 	if err != nil {
 		glog.Errorf("Fail to enqueue XQueueJob to updateQueue, err %#v", err)
