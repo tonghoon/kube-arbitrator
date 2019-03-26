@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"github.com/golang/glog"
+	"math/rand"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -113,6 +114,7 @@ type XController struct {
 
 	// Agent map: agentID -> XQueueJobAgent
 	agentMap map[string]*queuejobdispatch.XQueueJobAgent
+	agentList []string
 
 	// Map for XQueueJob -> XQueueJobAgent
 	dispatchMap map[string]string
@@ -266,12 +268,17 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	}
 
 	//create agents and agentMap
-	if isDispatcher {
-		glog.Infof("[Dispacther] Agent conf:%s\n", agentconfigs)
-	}
 	cc.agentMap=map[string]*queuejobdispatch.XQueueJobAgent{}
+	cc.agentList=[]string{}
 	for _, agentconfig := range strings.Split(agentconfigs,",") {
-		cc.agentMap[agentconfig]=queuejobdispatch.NewXQueueJobAgent(agentconfig)
+		agentData := strings.Split(agentconfig,":")
+		cc.agentMap[agentData[0]]=queuejobdispatch.NewXQueueJobAgent(agentconfig)
+		cc.agentList=append(cc.agentList, agentData[0])
+	}
+
+	if isDispatcher && len(cc.agentMap)==0 {
+		glog.Errorf("Dispatcher mode: no agent information")
+		return nil
 	}
 
 	//create (empty) dispatchMap
@@ -283,7 +290,7 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 func (qjm *XController) PreemptQueueJobs() {
 	qjobs := qjm.GetQueueJobsEligibleForPreemption()
 	for _, q := range qjobs {
-		glog.Infof("[Tonghoon] Change flags to Canrun=false: Preemption for Queuejob %s\n", q.Name)
+		// glog.Infof("[Tonghoon] Change flags to Canrun=false: Preemption for Queuejob %s\n", q.Name)
 		newjob, e := qjm.queueJobLister.XQueueJobs(q.Namespace).Get(q.Name)
 		if e != nil {
 			continue
@@ -310,7 +317,7 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 			replicas := value.Spec.SchedSpec.MinAvailable
 
 			if int(value.Status.Succeeded) == replicas {
-				glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
+				// glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
 				qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{
 				})
 				continue
@@ -321,7 +328,7 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 			glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
 			if int(value.Status.Running) < replicas {
 				glog.Infof("I need to preempt job %s --------------------------------------", value.Name)
-				glog.Infof("[Tonghoon] I need to preempt job %s --------------------------------------", value.Name)
+				// glog.Infof("[Tonghoon] I need to preempt job %s --------------------------------------", value.Name)
 				qjobs = append(qjobs, value)
 			}
 		}
@@ -413,15 +420,22 @@ func (qjm *XController) getAggregatedAvailableResourcesPriority(targetpr int, cq
 	return r
 }
 
-func (qjm *XController) chooseAgent(qjAggrResources *schedulerapi.Resource) string{
-	for agentId, xqueueAgent:= range qjm.agentMap {
-		resources := xqueueAgent.AggrResources
-		// return agentId			// must be deleted
-		if qjAggrResources.LessEqual(resources) {
-			glog.Infof("[Tonghoon] Agent %s has enough resouces\n", agentId)
-			return agentId
-		}
+func (qjm *XController) chooseAgent(qj *arbv1.XQueueJob) string{
+	qjAggrResources := qjm.GetAggregatedResources(qj)
+	glog.Infof("[Dispatcher: Agent Selection] Aggr Resources of XQJ %s: %v\n", qj.Name, qjAggrResources)
+
+	// for agentId, xqueueAgent:= range qjm.agentMap {
+	agentId := qjm.agentList[rand.Int() % len(qjm.agentList)]
+	glog.Infof("Dispactcher: Agent Selection] Agent %s is chosen randomly\n", agentId)
+	resources := qjm.agentMap[agentId].AggrResources
+	// resources := xqueueAgent.AggrResources
+	glog.Infof("[Dispatcher: Agent Selection] Aggr Resources of Agent %s: %v\n", agentId, resources)
+	if qjAggrResources.LessEqual(resources) {
+		glog.Infof("[Dispatcher: Agent Selection] Agent %s has enough resources\n", agentId)
+	return agentId
 	}
+	glog.Infof("[Dispatcher: Agent Selection] Agent %s does not have enough resources\n", agentId)
+	// }
 	return ""
 }
 
@@ -432,22 +446,19 @@ func (qjm *XController) ScheduleNext() {
 	// check if we have enough compute resources for it
 	// if we have enough compute resources then we set the AllocatedReplicas to the total
 	// amount of resources asked by the job
-	glog.Infof("=======Schedule Next QueueJob!!!=======")
 	qj, err := qjm.qjqueue.Pop()
 	if err != nil {
 		glog.Infof("Cannot pop QueueJob from the queue!")
 	}
-	glog.Infof("I have queuejob %+v", qj)
+	// glog.Infof("I have queuejob %+v", qj)
+	glog.Infof("[Dispatcher] Schedule Next QueueJob: %s\n", qj.Name)
 
 	if qj.Status.CanRun {
 		return
 	}
 
-	// Get resouce requirement of the queue-job
-	aggqj := qjm.GetAggregatedResources(qj)
-
 	if qjm.isDispatcher {
-		agentId:=qjm.chooseAgent(aggqj)
+		agentId:=qjm.chooseAgent(qj)
 		if agentId!="" {
 			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
 			if e != nil {
@@ -463,11 +474,14 @@ func (qjm *XController) ScheduleNext() {
 			qjm.dispatchMap[queueJobKey]=agentId
 			return
 		} else {
+			glog.Infof("[Dispatcher] Cannot find an Agent with enough Resources\n")
 			go qjm.backoff(qj)
 		}
 	// }
 		// }
 	} else {
+		aggqj := qjm.GetAggregatedResources(qj)
+
 		resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
 		glog.Infof("I have QueueJob with resources %v to be scheduled on aggregated idle resources %v", aggqj, resources)
 
@@ -493,32 +507,6 @@ func (qjm *XController) ScheduleNext() {
 			go qjm.backoff(qj)
 		}
 	}
-	// 	// Dispchter routine 	to choose a cluster to run the queue-job according to `Matching` algorithm
-	// 	for agentID, xqueueAgent:= range qjm.agentMap {
-	// 		resouces := xqueueAgent.aggrResouces
-	// 		if aggqj.LessEqual(resources) {
-	// 			newjob, e := qjm.queueJobLister.XQueueJobs(qj.Namespace).Get(qj.Name)
-	// 			if e != nil {
-	// 				return
-	// 			}
-	// 			newjob.Status.CanRun = true
-	// 			qj.Status.CanRun = true
-	// 			if _, err := qjm.arbclients.ArbV1().XQueueJobs(qj.Namespace).Update(newjob); err != nil {
-	// 													glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
-	// 																	qj.Namespace, qj.Name, err)
-	// 			}
-	// 			// qjm.dispatchMap[queueJobKey(qj)]=agentID
-	// 			qjm.dispatchStore(NewXQueueJobAndAgent(getQueueJobKey(qj),getQueueJobAgentKey(qa)))
-	//
-	// 			return
-	// 		}
-	// 	} else {
-	// 		go qjm.backoff(qj)
-	// 	}
-	// } else {		// Agent routine to check if there is enough resources in this cluster
-		// resources := qjm.getAggregatedAvailableResourcesPriority(qj.Spec.Priority, qj.Name)
-	// }
-
 }
 
 
@@ -552,19 +540,31 @@ func (cc *XController) Run(stopCh chan struct{}) {
 
 	go wait.Until(cc.UpdateQueueJobs, 2*time.Second, stopCh)
 
+	if cc.isDispatcher {
+		go wait.Until(cc.UpdateAgent, 2*time.Second, stopCh)
+	}
+
 	go wait.Until(cc.worker, time.Second, stopCh)
+}
+
+func (qjm *XController) UpdateAgent() {
+	glog.Infof("[Dispatcher] Update AggrResources for All Agents\n")
+	for _, xqueueAgent:= range qjm.agentMap {
+		xqueueAgent.UpdateAggrResources()
+	}
 
 }
 
+
 func (qjm *XController) UpdateQueueJobs() {
-	glog.Infof("[Tonghoon] UpdateQueueJobs\n")
+	// glog.Infof("[Tonghoon] UpdateQueueJobs\n")
 	queueJobs, err := qjm.queueJobLister.XQueueJobs("").List(labels.Everything())
 	if err != nil {
 		glog.Errorf("I return list of queueJobs %+v", err)
 		return
 	}
 	for _, newjob := range queueJobs {
-		glog.Infof("[Tonghoon] UpdateQueueJobs: [%s]\n", newjob.Name)
+		// glog.Infof("[Tonghoon] UpdateQueueJobs: [%s]\n", newjob.Name)
 		qjm.enqueue(newjob)
                 //if _, err := qjm.arbclients.ArbV1().XQueueJobs(newjob.Namespace).Update(newjob); err != nil {
                 //        glog.Errorf("Failed to update status of XQueueJob %v/%v: %v",
@@ -580,7 +580,7 @@ func (cc *XController) addQueueJob(obj interface{}) {
 		return
 	}
 	glog.V(4).Infof("QueueJob added - info -  %+v")
-	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added with %d\n", qj.Name, qj.Spec.SchedSpec.MinAvailable)
+	// glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added with %d\n", qj.Name, qj.Spec.SchedSpec.MinAvailable)
 	cc.enqueue(qj)
 }
 
@@ -590,7 +590,7 @@ func (cc *XController) updateQueueJob(oldObj, newObj interface{}) {
 		glog.Errorf("newObj is not XQueueJob")
 		return
 	}
-	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", newQJ.Name)
+	// glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", newQJ.Name)
 	cc.enqueue(newQJ)
 }
 
@@ -600,15 +600,15 @@ func (cc *XController) deleteQueueJob(obj interface{}) {
 		glog.Errorf("obj is not XQueueJob")
 		return
 	}
-	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: delete\n", qj.Name)
+	// glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: delete\n", qj.Name)
 	if qj.DeletionTimestamp == nil {
-		glog.Infof("[Tonghoon] DeleTimeStame is not Set\n")
+		// glog.Infof("[Tonghoon] DeleTimeStame is not Set\n")
 	}
 	cc.enqueue(qj)
 }
 
 func (cc *XController) enqueue(obj interface{}) {
-	glog.Infof("[Tonghoon] Job is Enqueued!!!!\n")
+	// glog.Infof("[Tonghoon] Job is Enqueued!!!!\n")
 	err := cc.eventQueue.Add(obj)
 	if err != nil {
 		glog.Errorf("Fail to enqueue XQueueJob to updateQueue, err %#v", err)
@@ -616,7 +616,7 @@ func (cc *XController) enqueue(obj interface{}) {
 }
 
 func (cc *XController) worker() {
-	glog.Infof("[Tonghoon] Worker Started\n")
+	// glog.Infof("[Tonghoon] Worker Started\n")
 	if _, err := cc.eventQueue.Pop(func(obj interface{}) error {
 		var queuejob *arbv1.XQueueJob
 		switch v := obj.(type) {
@@ -626,7 +626,7 @@ func (cc *XController) worker() {
 			glog.Errorf("Un-supported type of %v", obj)
 			return nil
 		}
-		glog.Infof("[Tonghoon] QueueJob %s pop up from eventQueue with min=%d\n", queuejob.Name, queuejob.Spec.SchedSpec.MinAvailable)
+		// glog.Infof("[Tonghoon] QueueJob %s pop up from eventQueue with min=%d\n", queuejob.Name, queuejob.Spec.SchedSpec.MinAvailable)
 		if queuejob == nil {
 			if acc, err := meta.Accessor(obj); err != nil {
 				glog.Warningf("Failed to get XQueueJob for %v/%v", acc.GetNamespace(), acc.GetName())
@@ -676,14 +676,14 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 	var err error
 	startTime := time.Now()
 	defer func() {
-		glog.Infof("Finished syncing queue job %q (%v)", qj.Name, time.Now().Sub(startTime))
+		glog.Infof("[Dispatcher] Finished syncing queue job %q (%v)", qj.Name, time.Now().Sub(startTime))
 	}()
 
-	if qj.DeletionTimestamp == nil {
-		glog.Infof("[Tonghoon] DeletionTimestame is not set for %s=================================\n", qj.Name)
-	} else {
-		glog.Infof("[Tonghoon] DeletionTimestame IS SET for %s===================================\n", qj.Name)
-	}
+	// if qj.DeletionTimestamp == nil {
+	// 	glog.Infof("[Tonghoon] DeletionTimestame is not set for %s=================================\n", qj.Name)
+	// } else {
+	// 	glog.Infof("[Tonghoon] DeletionTimestame IS SET for %s===================================\n", qj.Name)
+	// }
 
 	if(!cc.isDispatcher) {
 
@@ -715,7 +715,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 		if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
 			// if there are running resources for this job then delete them because the job was put in
 			// pending state...
-			glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
+			glog.Infof("[Dispatcher] Deleting resources for XQJ %s because it will be preempted (newjob)\n", qj.Name)
 			err = cc.Cleanup(qj)
 			if err != nil {
 				return err
@@ -731,7 +731,7 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 
 
 		if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
-			glog.Infof("Putting job in queue!")
+			glog.Infof("[Dispatcher] Putting XQJ %s in scheduling queue\n", qj.Name)
 			cc.qjqueue.AddIfNotPresent(qj)
 			return nil
 		}
@@ -787,14 +787,14 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			return nil
 		}
 
-		glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
-		glog.Infof("[Tonghoon] I have job with name %s status %+v ", qj.Name, qj.Status)
+		// glog.Infof("I have job with name %s status %+v ", qj.Name, qj.Status)
+		// glog.Infof("[Tonghoon] I have job with name %s status %+v ", qj.Name, qj.Status)
 
 		if !qj.Status.CanRun && (qj.Status.State != arbv1.QueueJobStateEnqueued && qj.Status.State != arbv1.QueueJobStateDeleted) {
 			// if there are running resources for this job then delete them because the job was put in
 			// pending state...
 			glog.Infof("Deleting queuejob resources because it will be preempted! %s", qj.Name)
-			glog.Infof("[Tonghoon] Deleting queuejob resources because it will be preempted! %s", qj.Name)
+			// glog.Infof("[Tonghoon] Deleting queuejob resources because it will be preempted! %s", qj.Name)
 			err = cc.Cleanup(qj)
 			if err != nil {
 				return err

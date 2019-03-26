@@ -44,25 +44,26 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if len(configStrings)<2 {
 		return nil
 	}
-	glog.Infof("[Agnet] Agent %s:%s Created\n", configStrings[0], configStrings[1])
+	glog.Infof("[Dispatcher: Agent] Creation: %s\n", configStrings[0])
 
-	agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/agent101config")
+	agent_config, err:=clientcmd.BuildConfigFromFlags("", configStrings[0])
+	// agent_config, err:=clientcmd.BuildConfigFromFlags("", "/root/agent101config")
 	if err!=nil {
-		glog.Infof("[Agent] Cannot crate client\n")
+		glog.Infof("[Dispatcher: Agent] Cannot crate client\n")
 		return nil
 	}
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
-		// DeploymentName: configStrings[1],
-		DeploymentName: "voting-moose-kube-arbitrator",
+		DeploymentName: configStrings[1],
+		// DeploymentName: "voting-moose-kube-arbitrator",
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
 		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
 		AggrResources: schedulerapi.EmptyResource(),
 	}
 	if qa.queuejobclients==nil {
-		glog.Infof("[Agnet] Cannot Create Client\n")
+		glog.Infof("[Dispatcher: Agent] Cannot Create Client\n")
 	} else {
-		glog.Infof("[Agnet] Create Client Suceessfully\n")
+		glog.Infof("[Dispatcher Agent] %s: Create Client Suceessfully\n", qa.AgentId)
 	}
 	qa.UpdateAggrResources()
 	return qa
@@ -70,22 +71,20 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) DeleteXQueueJob(cqj *arbv1.XQueueJob) {
 	qj_temp:=cqj.DeepCopy()
-	glog.Infof("[Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.AgentId)
+	glog.Infof("[Dispatcher: Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(qj_temp.Namespace).Delete(qj_temp.Name,  &metav1.DeleteOptions{})
 	return
 }
 
 func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
-	glog.Infof("[Agnet] Change XQJ Canrun and ...: %s in Agent %s====================\n", cqj.Name, qa.AgentId)
-
 	qj_temp:=cqj.DeepCopy()
 	agent_qj:=&arbv1.XQueueJob{
 		TypeMeta: qj_temp.TypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: qj_temp.Name, Namespace: qj_temp.Namespace,},
 		Spec: qj_temp.Spec,
 	}
-	glog.Infof("[Agent] XQJ resourceVersion cleaned--Name:%s, Kind:%s\n", agent_qj.Name, agent_qj.Kind)
-	glog.Infof("Create XQJ: %s in Agent %s====================\n", agent_qj.Name, qa.AgentId)
+	// glog.Infof("[Agent] XQJ resourceVersion cleaned--Name:%s, Kind:%s\n", agent_qj.Name, agent_qj.Kind)
+	glog.Infof("[Dispatcher: Agent] Create XQJ: %s in Agent %s\n", agent_qj.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(agent_qj)
 
 	// pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
@@ -101,18 +100,19 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 }
 
 func (qa *XQueueJobAgent) UpdateAggrResources() error {
-    glog.Infof("[Agent] Getting aggregated resources for Agent ID: %s with Agent QueueJob Name: %s\n", qa.AgentId, qa.DeploymentName)
+    // glog.Infof("[Dispatcher: Agent] Getting aggregated resources for Agent ID: %s with Agent QueueJob Name: %s\n", qa.AgentId, qa.DeploymentName)
 
     // Read the Agent XQJ Deployment object
     agentXQJDeployment, getErr := qa.deploymentclients.AppsV1().Deployments("kube-system").Get(qa.DeploymentName, metav1.GetOptions{})
     if getErr != nil {
         glog.Infof("Failed to get deployment Agent ID: %s with Agent QueueJob Name: %s, Error: %v\n", qa.AgentId, qa.DeploymentName, getErr)
     }
-    for key, value := range agentXQJDeployment.Labels {
-        glog.Infof("Agent QueueJob Name: %s has %s=%s: %s\n", qa.DeploymentName, key, value)
-    }
-    // qa.AggrResources=buildResource(agentXQJDeployment.Labels["available_cpu"], agentXQJDeployment.Labels["available_memory"])
-		qa.AggrResources=buildResource("999999","99999999")
+    // for key, value := range agentXQJDeployment.Labels {
+    //     glog.Infof("Agent QueueJob Name: %s has %s=%s\n", qa.DeploymentName, key, value)
+    // }
+    qa.AggrResources=buildResource(agentXQJDeployment.Labels["available_cpu"]+"m", agentXQJDeployment.Labels["available_memory"]+"Ki")
+		glog.Infof("[Dispatcher: Agent] Updated Aggr Resources of %s: %v\n", qa.AgentId, qa.AggrResources)
+		// qa.AggrResources=buildResource("99999999","9999999999")
     return nil
 }
 
