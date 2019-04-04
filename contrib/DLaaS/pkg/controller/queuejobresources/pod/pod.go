@@ -139,16 +139,17 @@ func (qjrPod *QueueJobResPod) Run(stopCh <-chan struct{}) {
 }
 
 func (qjrPod *QueueJobResPod) addPod(obj interface{}) {
-
+	glog.Infof("[Tonghoon] addPod Function\n")
 	return
 }
 
 func (qjrPod *QueueJobResPod) updatePod(old, cur interface{}) {
-
+	glog.Infof("[Tonghoon] updatePod Function\n")
 	return
 }
 
 func (qjrPod *QueueJobResPod) deletePod(obj interface{}) {
+	glog.Infof("[Tonghoon] deletePod Function\n")
 	var pod *v1.Pod
 	switch t := obj.(type) {
 	case *v1.Pod:
@@ -425,6 +426,8 @@ func (qjrPod *QueueJobResPod) manageQueueJobPods(activePods []*v1.Pod, succeeded
 }
 
 func (qjrPod *QueueJobResPod) terminatePodsForQueueJob(qj *arbv1.XQueueJob) error {
+
+	glog.Infof("[Tonghoon] Pods are deleted for XQJ: %s\n", qj.Name)
 	pods, err := qjrPod.getPodsForQueueJob(qj)
 	if len(pods) == 0 || err != nil {
 		return err

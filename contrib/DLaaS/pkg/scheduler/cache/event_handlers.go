@@ -145,6 +145,7 @@ func (sc *SchedulerCache) deletePod(pod *v1.Pod) error {
 
 	// If job was terminated, delete it.
 	if job, found := sc.Jobs[pi.Job]; found && arbapi.JobTerminated(job) {
+		glog.Infof("[Tonghoon] DELETEJOB -- deletePod\n")
 		sc.deleteJob(job)
 	}
 
@@ -361,7 +362,7 @@ func (sc *SchedulerCache) deleteSchedulingSpec(ss *arbv1.SchedulingSpec) error {
 
 	// Unset SchedulingSpec
 	job.UnsetSchedulingSpec()
-
+	glog.Infof("[Tonghoon] DELETEJOB -- deleteSchedulingSpec\n")
 	sc.deleteJob(job)
 
 	return nil
@@ -470,7 +471,7 @@ func (sc *SchedulerCache) deletePDB(pdb *policyv1.PodDisruptionBudget) error {
 
 	// Unset SchedulingSpec
 	job.UnsetPDB()
-
+	glog.Infof("[Tonghoon] DELETEJOB -- deletePDB\n")
 	sc.deleteJob(job)
 
 	return nil

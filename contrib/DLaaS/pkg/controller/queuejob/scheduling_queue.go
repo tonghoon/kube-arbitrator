@@ -83,7 +83,7 @@ type PriorityQueue struct {
 	activeQ *Heap
 	// unschedulableQ holds QJs that have been tried and determined unschedulable.
 	unschedulableQ *UnschedulableQJMap
-	
+
 	receivedMoveRequest bool
 }
 
@@ -128,6 +128,7 @@ func (p *PriorityQueue) AddIfNotPresent(qj *qjobv1.XQueueJob) error {
 	if _, exists, _ := p.activeQ.Get(qj); exists {
 		return nil
 	}
+	glog.Infof("[Tonghoon] XQJ %s does not exist and put in qjqueue\n", qj.Name)
 	err := p.activeQ.Add(qj)
 	if err != nil {
 		glog.Errorf("Error adding pod %v to the scheduling queue: %v", qj.Name, err)
@@ -340,4 +341,3 @@ func newUnschedulableQJMap() *UnschedulableQJMap {
 		keyFunc: GetXQJFullName,
 	}
 }
-
