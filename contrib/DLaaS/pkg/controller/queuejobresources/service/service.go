@@ -314,6 +314,5 @@ func (qjrService *QueueJobResService) deleteQueueJobResServices(qjobRes *arbv1.X
 
 //Cleanup deletes all services
 func (qjrService *QueueJobResService) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
-
 	return qjrService.deleteQueueJobResServices(qjobRes, queuejob)
 }

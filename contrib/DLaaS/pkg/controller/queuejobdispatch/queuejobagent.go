@@ -63,7 +63,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	if qa.queuejobclients==nil {
 		glog.V(2).Infof("[Dispatcher: Agent] Cannot Create Client\n")
 	} else {
-		glog.V(2).Infof("[Dispatcher Agent] %s: Create Clients Suceessfully\n", qa.AgentId)
+		glog.V(2).Infof("[Dispatcher: Agent] %s: Create Clients Suceessfully\n", qa.AgentId)
 	}
 	qa.UpdateAggrResources()
 	return qa
@@ -71,7 +71,7 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 
 func (qa *XQueueJobAgent) DeleteXQueueJob(cqj *arbv1.XQueueJob) {
 	qj_temp:=cqj.DeepCopy()
-	glog.V(2).Infof("[Dispatcher: Agent] XQueueJob is deleted from Agent %s\n", qj_temp.Name, qa.AgentId)
+	glog.V(2).Infof("[Dispatcher: Agent] Request deletion of XQJ %s to Agent %s\n", qj_temp.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(qj_temp.Namespace).Delete(qj_temp.Name,  &metav1.DeleteOptions{})
 	return
 }

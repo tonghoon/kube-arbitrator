@@ -46,8 +46,12 @@ type SchedulingQueue interface {
 	Pop() (*qjobv1.XQueueJob, error)
 	Update(oldQJ, newQJ *qjobv1.XQueueJob) error
 	Delete(QJ *qjobv1.XQueueJob) error
+	MoveToActiveQueueIfExists(QJ *qjobv1.XQueueJob) error
 	MoveAllToActiveQueue()
+	IfExist(QJ *qjobv1.XQueueJob) bool
 }
+
+
 
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
 // enabled a priority queue is returned. If it is disabled, a FIFO is returned.
@@ -99,6 +103,36 @@ func NewPriorityQueue() *PriorityQueue {
 	return pq
 }
 
+func (p *PriorityQueue) IfExist(qj *qjobv1.XQueueJob) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	_, exists, _ := p.activeQ.Get(qj)
+	if (p.unschedulableQ.Get(qj)!= nil || exists) {
+		return true
+	}
+	return false
+}
+
+
+// Move QJ from unschedulableQ to activeQ if exists
+func (p *PriorityQueue) MoveToActiveQueueIfExists(qj *qjobv1.XQueueJob) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.unschedulableQ.Get(qj) != nil {
+		p.unschedulableQ.Delete(qj)
+		err := p.activeQ.Add(qj)
+		if err != nil {
+			glog.Errorf("Error adding QJ %v to the scheduling queue: %v\n", qj.Name, err)
+		}
+		p.cond.Broadcast()
+		return err
+	}
+	return nil
+}
+
+
+
+
 // Add adds a QJ to the active queue. It should be called only when a new QJ
 // is added so there is no chance the QJ is already in either queue.
 func (p *PriorityQueue) Add(qj *qjobv1.XQueueJob) error {
@@ -128,7 +162,6 @@ func (p *PriorityQueue) AddIfNotPresent(qj *qjobv1.XQueueJob) error {
 	if _, exists, _ := p.activeQ.Get(qj); exists {
 		return nil
 	}
-	glog.Infof("[Tonghoon] XQJ %s does not exist and put in qjqueue\n", qj.Name)
 	err := p.activeQ.Add(qj)
 	if err != nil {
 		glog.Errorf("Error adding pod %v to the scheduling queue: %v", qj.Name, err)
@@ -157,7 +190,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(qj *qjobv1.XQueueJob) error
 	if _, exists, _ := p.activeQ.Get(qj); exists {
 		return fmt.Errorf("pod is already present in the activeQ")
 	}
-	if !p.receivedMoveRequest && isPodUnschedulable(qj) {
+	// if !p.receivedMoveRequest && isPodUnschedulable(qj) {
+	if !p.receivedMoveRequest {
 		p.unschedulableQ.Add(qj)
 		return nil
 	}
@@ -235,10 +269,11 @@ func (p *PriorityQueue) Update(oldQJ, newQJ *qjobv1.XQueueJob) error {
 func (p *PriorityQueue) Delete(qj *qjobv1.XQueueJob) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	p.unschedulableQ.Delete(qj)
 	if _, exists, _ := p.activeQ.Get(qj); exists {
 		return p.activeQ.Delete(qj)
 	}
-	p.unschedulableQ.Delete(qj)
+	// p.unschedulableQ.Delete(qj)
 	return nil
 }
 

@@ -104,6 +104,11 @@ const (
 	ResourceTypeStatefulSet ResourceType = "StatefulSet"
 	ResourceTypeDeployment  ResourceType = "Deployment"
 	ResourceTypeReplicaSet  ResourceType = "ReplicaSet"
+	ResourceTypePersistentVolume	ResourceType = "PersistentVolume"
+	ResourceTypePersistentVolumeClaim	ResourceType = "PersistentVolumeClaim"
+	ResourceTypeNamespace	ResourceType = "Namespace"
+	ResourceTypeConfigMap	ResourceType = "ConfigMap"
+	ResourceTypeNetworkPolicy	ResourceType = "NetworkPolicy"
 )
 
 // QueueJobStatus represents the current state of a QueueJob
