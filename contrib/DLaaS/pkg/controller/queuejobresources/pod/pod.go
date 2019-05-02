@@ -220,8 +220,10 @@ func (qjrPod *QueueJobResPod) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) er
   if err != nil {
           return fmt.Errorf("couldn't convert QueueJob selector: %v", err)
   }
-  // List all pods under QueueJob
-  pods, errt := qjrPod.podStore.Pods(queuejob.Namespace).List(selector)
+	// List all pods under QueueJob
+	// pods, errt := qjrPod.podStore.Pods(queuejob.Namespace).List(selector)
+	pods, errt := qjrPod.podStore.Pods("").List(selector)
+
   if errt != nil {
           return  errt
   }
@@ -231,7 +233,7 @@ func (qjrPod *QueueJobResPod) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) er
   succeeded := int32(queuejobresources.FilterPods(pods, v1.PodSucceeded))
   failed := int32(queuejobresources.FilterPods(pods, v1.PodFailed))
 
-	log.Infof("There are %d pods of QueueJob %s:  pending %d, running %d, succeeded %d, failed %d", len(pods), queuejob.Name,  pending, running, succeeded, failed)
+	glog.Infof("There are %d pods of QueueJob %s:  pending %d, running %d, succeeded %d, failed %d", len(pods), queuejob.Name,  pending, running, succeeded, failed)
 
 	old_flag := queuejob.Status.CanRun
 	old_state := queuejob.Status.State
