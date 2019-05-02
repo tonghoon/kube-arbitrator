@@ -22,7 +22,7 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +110,7 @@ func (qjrNamespace *QueueJobResNamespace) Run(stopCh <-chan struct{}) {
 	qjrNamespace.namespaceInformer.Informer().Run(stopCh)
 }
 
-func (qjrPod *QueueJobResNamespace) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrNamespace *QueueJobResNamespace) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
 	return schedulerapi.EmptyResource()
 }
 
@@ -130,7 +130,7 @@ func (qjrNamespace *QueueJobResNamespace) deleteNamespace(obj interface{}) {
 }
 
 
-func (qjrPod *QueueJobResNamespace) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrNamespace *QueueJobResNamespace) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         return total
 }
@@ -157,7 +157,7 @@ func (qjrNamespace *QueueJobResNamespace) getNamespaceTemplate(qjobRes *arbv1.XQ
 
 func (qjrNamespace *QueueJobResNamespace) createNamespaceWithControllerRef(namespace *v1.Namespace, controllerRef *metav1.OwnerReference) error {
 
-	glog.V(4).Infof("==========create Namespace: %+v \n", namespace)
+	// glog.V(4).Infof("==========create Namespace: %+v \n", namespace)
 	if controllerRef != nil {
 		namespace.OwnerReferences = append(namespace.OwnerReferences, *controllerRef)
 	}
@@ -179,7 +179,7 @@ func (qjrNamespace *QueueJobResNamespace) delNamespace(name string) error {
 	return nil
 }
 
-func (qjrPod *QueueJobResNamespace) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrNamespace *QueueJobResNamespace) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
@@ -188,7 +188,8 @@ func (qjrNamespace *QueueJobResNamespace) SyncQueueJob(queuejob *arbv1.XQueueJob
 
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %s (%v)", qjobRes.Template, time.Now().Sub(startTime))
 	}()
 
 	namespaces, err := qjrNamespace.getNamespaceForQueueJobRes(qjobRes, queuejob)
@@ -201,7 +202,7 @@ func (qjrNamespace *QueueJobResNamespace) SyncQueueJob(queuejob *arbv1.XQueueJob
 
 	diff := int(replicas) - int(namespaceLen)
 
-	glog.V(4).Infof("QJob: %s had %d namespaces and %d desired namespaces", queuejob.Name, replicas, namespaceLen)
+	glog.V(4).Infof("QJob: %s had %d namespaces and %d desired namespaces", queuejob.Name, namespaceLen, replicas)
 
 	if diff > 0 {
 		template, err := qjrNamespace.getNamespaceTemplate(qjobRes)
@@ -223,6 +224,8 @@ func (qjrNamespace *QueueJobResNamespace) SyncQueueJob(queuejob *arbv1.XQueueJob
 		for k, v := range tmpNamespace.Labels {
 			template.Labels[k] = v
 		}
+		template.Labels[queueJobName] = queuejob.Name
+
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
@@ -244,25 +247,17 @@ func (qjrNamespace *QueueJobResNamespace) SyncQueueJob(queuejob *arbv1.XQueueJob
 }
 
 func (qjrNamespace *QueueJobResNamespace) getNamespaceForQueueJob(j *arbv1.XQueueJob) ([]*v1.Namespace, error) {
-	namespacelist, err := qjrNamespace.clients.CoreV1().Namespaces().List(metav1.ListOptions{})
+	// namespacelist, err := qjrNamespace.clients.CoreV1().Namespaces().List(metav1.ListOptions{})
+	namespacelist, err := qjrNamespace.clients.CoreV1().Namespaces().List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, j.Name),})
 	if err != nil {
 		return nil, err
 	}
 
 	namespaces := []*v1.Namespace{}
-	for i, namespace := range namespacelist.Items {
-		metaNamespace, err := meta.Accessor(&namespace)
-		if err != nil {
-			return nil, err
-		}
-
-		controllerRef := metav1.GetControllerOf(metaNamespace)
-		if controllerRef != nil {
-			if controllerRef.UID == j.UID {
+	for i, _ := range namespacelist.Items {
 				namespaces = append(namespaces, &namespacelist.Items[i])
-			}
-		}
 	}
+
 	return namespaces, nil
 
 }

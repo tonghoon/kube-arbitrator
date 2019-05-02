@@ -13,36 +13,6 @@ limitations under the License.
 
 package networkpolicy
 
-// import (
-// 	"fmt"
-// 	"github.com/golang/glog"
-// 	arbv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
-// 	clientset "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned"
-// 	"github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/controller/queuejobresources"
-// 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
-// 	"k8s.io/api/core/v1"
-// 	"k8s.io/apimachinery/pkg/api/errors"
-// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-// 	"k8s.io/apimachinery/pkg/runtime"
-// 	"k8s.io/apimachinery/pkg/runtime/schema"
-// 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-// 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-// 	"k8s.io/client-go/informers"
-// 	"k8s.io/client-go/kubernetes"
-// 	"sync"
-// 	"time"
-//
-// 	"k8s.io/apimachinery/pkg/api/meta"
-//
-// 	ssinformer "k8s.io/client-go/informers/apps/v1"
-// 	sslister "k8s.io/client-go/listers/apps/v1"
-// 	"k8s.io/api/extensions/v1beta1"
-// 	apps "k8s.io/api/apps/v1"
-// 	"k8s.io/client-go/rest"
-// 	"k8s.io/client-go/tools/cache"
-// )
-
-
 import (
 	"fmt"
 	"github.com/golang/glog"
@@ -52,7 +22,7 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 	// "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -146,7 +116,7 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) Run(stopCh <-chan struct{}) {
 	qjrNetworkPolicy.networkpolicyInformer.Informer().Run(stopCh)
 }
 
-func (qjrPod *QueueJobResNetworkPolicy) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrNetworkPolicy *QueueJobResNetworkPolicy) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
 	return schedulerapi.EmptyResource()
 }
 
@@ -166,7 +136,7 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) deleteNetworkPolicy(obj interf
 }
 
 
-func (qjrPod *QueueJobResNetworkPolicy) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrNetworkPolicy *QueueJobResNetworkPolicy) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         return total
 }
@@ -188,7 +158,7 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) getNetworkPolicyTemplate(qjobR
 
 	obj, _, err := qjrNetworkPolicy.jsonSerializer.Decode(qjobRes.Template.Raw, &networkpolicyGVK, nil)
 	if err != nil {
-		glog.Infof("Decoding Error for NetworkPolicy=================================================")
+		// glog.Infof("Decoding Error for NetworkPolicy=================================================")
 		return nil, err
 	}
 
@@ -203,7 +173,7 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) getNetworkPolicyTemplate(qjobR
 
 func (qjrNetworkPolicy *QueueJobResNetworkPolicy) createNetworkPolicyWithControllerRef(namespace string, networkpolicy *networkingv1.NetworkPolicy, controllerRef *metav1.OwnerReference) error {
 
-	glog.V(4).Infof("==========create NetworkPolicy: %+v \n", networkpolicy)
+	// glog.V(4).Infof("==========create NetworkPolicy: %+v \n", networkpolicy)
 	if controllerRef != nil {
 		networkpolicy.OwnerReferences = append(networkpolicy.OwnerReferences, *controllerRef)
 	}
@@ -225,57 +195,57 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) delNetworkPolicy(namespace str
 	return nil
 }
 
-func (qjrPod *QueueJobResNetworkPolicy) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrNetworkPolicy *QueueJobResNetworkPolicy) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
-//SyncQueueJob syncs the services
+
 func (qjrNetworkPolicy *QueueJobResNetworkPolicy) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
 
 	startTime := time.Now()
+
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
 	}()
 
-	networkpolicies, err := qjrNetworkPolicy.getNetworkPolicyForQueueJobRes(qjobRes, queuejob)
+	_namespace, networkPolicyInQjr, networkPoliciesInEtcd, err := qjrNetworkPolicy.getNetworkPolicyForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
 
-	networkpolicyLen := len(networkpolicies)
-
+	networkPolicyLen := len(networkPoliciesInEtcd)
 	replicas := qjobRes.Replicas
 
-	diff := int(replicas) - int(networkpolicyLen)
+	diff := int(replicas) - int(networkPolicyLen)
 
-	glog.V(4).Infof("QJob: %s had %d networkpolicies and %d desired networkpolicies", queuejob.Name, replicas, networkpolicyLen)
+	glog.V(4).Infof("QJob: %s had %d NetworkPolicies and %d desired NetworkPolicies", queuejob.Name, networkPolicyLen, replicas)
 
 	if diff > 0 {
-		template, err := qjrNetworkPolicy.getNetworkPolicyTemplate(qjobRes)
-		if err != nil {
-			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
-			return err
-		}
 		//TODO: need set reference after Service has been really added
 		tmpNetworkPolicy := networkingv1.NetworkPolicy{}
 		err = qjrNetworkPolicy.refManager.AddReference(qjobRes, &tmpNetworkPolicy)
 		if err != nil {
-			glog.Errorf("Cannot add reference to networkpolicy resource %+v", err)
+			glog.Errorf("Cannot add reference to configmap resource %+v", err)
 			return err
 		}
 
-		if template.Labels == nil {
-			template.Labels = map[string]string{}
+		if networkPolicyInQjr.Labels == nil {
+			networkPolicyInQjr.Labels = map[string]string{}
 		}
 		for k, v := range tmpNetworkPolicy.Labels {
-			template.Labels[k] = v
+			networkPolicyInQjr.Labels[k] = v
 		}
+		networkPolicyInQjr.Labels[queueJobName] = queuejob.Name
+
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				err := qjrNetworkPolicy.createNetworkPolicyWithControllerRef(queuejob.Namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+
+				err := qjrNetworkPolicy.createNetworkPolicyWithControllerRef(*_namespace, networkPolicyInQjr, metav1.NewControllerRef(queuejob, queueJobKind))
+
 				if err != nil && errors.IsTimeout(err) {
 					return
 				}
@@ -290,53 +260,60 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) SyncQueueJob(queuejob *arbv1.X
 	return nil
 }
 
-func (qjrNetworkPolicy *QueueJobResNetworkPolicy) getNetworkPolicyForQueueJob(j *arbv1.XQueueJob) ([]*networkingv1.NetworkPolicy, error) {
-	networkpolicylist, err := qjrNetworkPolicy.clients.NetworkingV1().NetworkPolicies(j.Namespace).List(metav1.ListOptions{})
+
+func (qjrNetworkPolicy *QueueJobResNetworkPolicy) getNetworkPolicyForQueueJobRes(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) (*string, *networkingv1.NetworkPolicy, []*networkingv1.NetworkPolicy, error) {
+
+	// Get "a" NetworkPolicy from XQJ Resource
+	networkPolicyInQjr, err := qjrNetworkPolicy.getNetworkPolicyTemplate(qjobRes)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+		return nil, nil, nil, err
 	}
 
-	networkpolicies := []*networkingv1.NetworkPolicy{}
-	for i, networkpolicy := range networkpolicylist.Items {
-		metaNetworkPolicy, err := meta.Accessor(&networkpolicy)
-		if err != nil {
-			return nil, err
-		}
-
-		controllerRef := metav1.GetControllerOf(metaNetworkPolicy)
-		if controllerRef != nil {
-			if controllerRef.UID == j.UID {
-				networkpolicies = append(networkpolicies, &networkpolicylist.Items[i])
-			}
+	// Get NetworkPolicy"s" in Etcd Server
+	var _namespace *string
+	if networkPolicyInQjr.Namespace!=""{
+		_namespace = &networkPolicyInQjr.Namespace
+	} else {
+		_namespace = &queuejob.Namespace
+	}
+	// networkPolicyList, err := qjrNetworkPolicy.clients.Networking().NetworkPolicies(*_namespace).List(metav1.ListOptions{})
+	networkPolicyList, err := qjrNetworkPolicy.clients.Networking().NetworkPolicies(*_namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, queuejob.Name),})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	networkPoliciesInEtcd := []*networkingv1.NetworkPolicy{}
+	for i,  _ := range networkPolicyList.Items {
+				networkPoliciesInEtcd = append(networkPoliciesInEtcd, &networkPolicyList.Items[i])
+	}
+	// for i, networkPolicy := range networkPolicyList.Items {
+	// 	metaNetworkPolicy, err := meta.Accessor(&networkPolicy)
+	// 	if err != nil {
+	// 		return nil, nil, nil, err
+	// 	}
+	// 	controllerRef := metav1.GetControllerOf(metaNetworkPolicy)
+	// 	if controllerRef != nil {
+	// 		if controllerRef.UID == queuejob.UID {
+	// 			networkPoliciesInEtcd = append(networkPoliciesInEtcd, &networkPolicyList.Items[i])
+	// 		}
+	// 	}
+	// }
+	myNetworkPoliciesInEtcd := []*networkingv1.NetworkPolicy{}
+	for i, networkPolicy := range networkPoliciesInEtcd {
+		if qjrNetworkPolicy.refManager.BelongTo(qjobRes, networkPolicy) {
+			myNetworkPoliciesInEtcd = append(myNetworkPoliciesInEtcd, networkPoliciesInEtcd[i])
 		}
 	}
-	return networkpolicies, nil
 
+	return _namespace, networkPolicyInQjr, myNetworkPoliciesInEtcd, nil
 }
 
-func (qjrNetworkPolicy *QueueJobResNetworkPolicy) getNetworkPolicyForQueueJobRes(qjobRes *arbv1.XQueueJobResource, j *arbv1.XQueueJob) ([]*networkingv1.NetworkPolicy, error) {
-
-	networkpolicies, err := qjrNetworkPolicy.getNetworkPolicyForQueueJob(j)
-	if err != nil {
-		return nil, err
-	}
-
-	myNetworkPolicies := []*networkingv1.NetworkPolicy{}
-	for i, networkpolicy := range networkpolicies {
-		if qjrNetworkPolicy.refManager.BelongTo(qjobRes, networkpolicy) {
-			myNetworkPolicies = append(myNetworkPolicies, networkpolicies[i])
-		}
-	}
-
-	return myNetworkPolicies, nil
-
-}
 
 func (qjrNetworkPolicy *QueueJobResNetworkPolicy) deleteQueueJobResNetworkPolicies(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
 
 	job := *queuejob
 
-	activeNetworkPolicies, err := qjrNetworkPolicy.getNetworkPolicyForQueueJobRes(qjobRes, queuejob)
+	_namespace, _, activeNetworkPolicies, err := qjrNetworkPolicy.getNetworkPolicyForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
@@ -348,9 +325,9 @@ func (qjrNetworkPolicy *QueueJobResNetworkPolicy) deleteQueueJobResNetworkPolici
 	for i := int32(0); i < active; i++ {
 		go func(ix int32) {
 			defer wait.Done()
-			if err := qjrNetworkPolicy.delNetworkPolicy(queuejob.Namespace, activeNetworkPolicies[ix].Name); err != nil {
+			if err := qjrNetworkPolicy.delNetworkPolicy(*_namespace, activeNetworkPolicies[ix].Name); err != nil {
 				defer utilruntime.HandleError(err)
-				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeNetworkPolicies[ix].Name, job.Namespace, job.Name)
+				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeNetworkPolicies[ix].Name, *_namespace, job.Name)
 			}
 		}(i)
 	}

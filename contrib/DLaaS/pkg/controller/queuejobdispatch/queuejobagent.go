@@ -29,6 +29,13 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	arbinformers "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion"
+	informersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/informers/controller-externalversion/v1"
+	listersv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/listers/controller/v1"
+	"k8s.io/client-go/tools/cache"
+
+	"github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/client/clientset/controller-versioned/clients"
 )
 
 type XQueueJobAgent struct{
@@ -37,7 +44,12 @@ type XQueueJobAgent struct{
 		queuejobclients			*clientset.Clientset
 		deploymentclients    *kubernetes.Clientset				// for the upate of aggr resouces
 		AggrResources *schedulerapi.Resource
+
+		queueJobInformer informersv1.XQueueJobInformer
+		queueJobLister listersv1.XQueueJobLister
+		queueJobSynced func() bool
 }
+
 
 func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	configStrings:=strings.Split(config, ":")
@@ -55,7 +67,6 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	qa := &XQueueJobAgent{
 		AgentId:	configStrings[0],
 		DeploymentName: configStrings[1],
-		// DeploymentName: "voting-moose-kube-arbitrator",
 		queuejobclients:	clientset.NewForConfigOrDie(agent_config),
 		deploymentclients:    kubernetes.NewForConfigOrDie(agent_config),
 		AggrResources: schedulerapi.EmptyResource(),
@@ -65,8 +76,80 @@ func NewXQueueJobAgent(config string) *XQueueJobAgent {
 	} else {
 		glog.V(2).Infof("[Dispatcher: Agent] %s: Create Clients Suceessfully\n", qa.AgentId)
 	}
+
+	queueJobClientForInformer, _, err := clients.NewClient(agent_config)
+	if err != nil {
+		panic(err)
+	}
+
+	qa.queueJobInformer = arbinformers.NewSharedInformerFactory(queueJobClientForInformer, 0).XQueueJob().XQueueJobs()
+	qa.queueJobInformer.Informer().AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *arbv1.XQueueJob:
+					glog.V(4).Infof("Filter XQueueJob name(%s) namespace(%s)\n", t.Name, t.Namespace)
+					return true
+				default:
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    qa.addQueueJob,
+				UpdateFunc: qa.updateQueueJob,
+				DeleteFunc: qa.deleteQueueJob,
+			},
+		})
+	qa.queueJobLister = qa.queueJobInformer.Lister()
+
+	qa.queueJobSynced = qa.queueJobInformer.Informer().HasSynced
+
 	qa.UpdateAggrResources()
+
 	return qa
+}
+
+
+func (cc *XQueueJobAgent) addQueueJob(obj interface{}) {
+	qj, ok := obj.(*arbv1.XQueueJob)
+	if !ok {
+		glog.Errorf("obj is not XQueueJob")
+		return
+	}
+	glog.V(4).Infof("QueueJob added - info -  %+v")
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: added with %d\n", qj.Name, qj.Spec.SchedSpec.MinAvailable)
+	// cc.enqueue(qj)
+}
+
+func (cc *XQueueJobAgent) updateQueueJob(oldObj, newObj interface{}) {
+	newQJ, ok := newObj.(*arbv1.XQueueJob)
+	if !ok {
+		glog.Errorf("newObj is not XQueueJob")
+		return
+	}
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: update\n", newQJ.Name)
+	// cc.enqueue(newQJ)
+}
+
+func (cc *XQueueJobAgent) deleteQueueJob(obj interface{}) {
+	qj, ok := obj.(*arbv1.XQueueJob)
+	if !ok {
+		glog.Errorf("obj is not XQueueJob")
+		return
+	}
+	glog.Infof("[Tonghoon] QueueJob %s added to eventQueue: delete\n", qj.Name)
+	// if qj.DeletionTimestamp == nil {
+	// 	glog.Infof("[Tonghoon] DeleTimeStame is not Set\n")
+	// }
+	// cc.enqueue(qj)
+}
+
+
+
+func (qa *XQueueJobAgent) Run(stopCh chan struct{}) {
+	go qa.queueJobInformer.Informer().Run(stopCh)
+	cache.WaitForCacheSync(stopCh, qa.queueJobSynced)
+	// go wait.Until(qa.UpdateAgent, 2*time.Second, stopCh)
 }
 
 func (qa *XQueueJobAgent) DeleteXQueueJob(cqj *arbv1.XQueueJob) {
@@ -83,10 +166,11 @@ func (qa *XQueueJobAgent) CreateXQueueJob(cqj *arbv1.XQueueJob) {
 		ObjectMeta: metav1.ObjectMeta{Name: qj_temp.Name, Namespace: qj_temp.Namespace,},
 		Spec: qj_temp.Spec,
 	}
+	agent_qj.Status.CanRun=qj_temp.Status.CanRun
+	agent_qj.Status.IsDispatched=qj_temp.Status.IsDispatched
 	// glog.Infof("[Agent] XQJ resourceVersion cleaned--Name:%s, Kind:%s\n", agent_qj.Name, agent_qj.Kind)
 	glog.V(2).Infof("[Dispatcher: Agent] Create XQJ: %s in Agent %s\n", agent_qj.Name, qa.AgentId)
 	qa.queuejobclients.ArbV1().XQueueJobs(agent_qj.Namespace).Create(agent_qj)
-
 	// pods, err := qa.deploymentclients.CoreV1().Pods("").List(metav1.ListOptions{})
 	// if err != nil {
 	// 	glog.Infof("[Agent] Cannot Access Agent================\n")

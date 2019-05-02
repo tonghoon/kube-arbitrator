@@ -22,7 +22,7 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +110,7 @@ func (qjrService *QueueJobResService) Run(stopCh <-chan struct{}) {
 	qjrService.serviceInformer.Informer().Run(stopCh)
 }
 
-func (qjrPod *QueueJobResService) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrService *QueueJobResService) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
 	return schedulerapi.EmptyResource()
 }
 
@@ -130,7 +130,7 @@ func (qjrService *QueueJobResService) deleteService(obj interface{}) {
 }
 
 
-func (qjrPod *QueueJobResService) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrService *QueueJobResService) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         return total
 }
@@ -157,7 +157,7 @@ func (qjrService *QueueJobResService) getServiceTemplate(qjobRes *arbv1.XQueueJo
 
 func (qjrService *QueueJobResService) createServiceWithControllerRef(namespace string, service *v1.Service, controllerRef *metav1.OwnerReference) error {
 
-	glog.V(4).Infof("==========create service: %s,  %+v \n", namespace, service)
+	// glog.V(4).Infof("==========create service: %s,  %+v \n", namespace, service)
 	if controllerRef != nil {
 		service.OwnerReferences = append(service.OwnerReferences, *controllerRef)
 	}
@@ -179,56 +179,56 @@ func (qjrService *QueueJobResService) delService(namespace string, name string) 
 	return nil
 }
 
-func (qjrPod *QueueJobResService) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrService *QueueJobResService) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
-//SyncQueueJob syncs the services
 func (qjrService *QueueJobResService) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
 
 	startTime := time.Now()
+
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
 	}()
 
-	services, err := qjrService.getServicesForQueueJobRes(qjobRes, queuejob)
+	_namespace, serviceInQjr, servicesInEtcd, err := qjrService.getServiceForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
 
-	serviceLen := len(services)
+	serviceLen := len(servicesInEtcd)
 	replicas := qjobRes.Replicas
 
 	diff := int(replicas) - int(serviceLen)
 
-	glog.V(4).Infof("QJob: %s had %d services and %d desired services", queuejob.Name, replicas, serviceLen)
+	glog.V(4).Infof("QJob: %s had %d Services and %d desired Services", queuejob.Name, serviceLen, replicas)
 
 	if diff > 0 {
-		template, err := qjrService.getServiceTemplate(qjobRes)
-		if err != nil {
-			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
-			return err
-		}
 		//TODO: need set reference after Service has been really added
 		tmpService := v1.Service{}
 		err = qjrService.refManager.AddReference(qjobRes, &tmpService)
 		if err != nil {
-			glog.Errorf("Cannot add reference to service resource %+v", err)
+			glog.Errorf("Cannot add reference to configmap resource %+v", err)
 			return err
 		}
 
-		if template.Labels == nil {
-			template.Labels = map[string]string{}
+		if serviceInQjr.Labels == nil {
+			serviceInQjr.Labels = map[string]string{}
 		}
 		for k, v := range tmpService.Labels {
-			template.Labels[k] = v
+			serviceInQjr.Labels[k] = v
 		}
+		serviceInQjr.Labels[queueJobName] = queuejob.Name
+
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				err := qjrService.createServiceWithControllerRef(queuejob.Namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+
+				err := qjrService.createServiceWithControllerRef(*_namespace, serviceInQjr, metav1.NewControllerRef(queuejob, queueJobKind))
+
 				if err != nil && errors.IsTimeout(err) {
 					return
 				}
@@ -243,53 +243,60 @@ func (qjrService *QueueJobResService) SyncQueueJob(queuejob *arbv1.XQueueJob, qj
 	return nil
 }
 
-func (qjrService *QueueJobResService) getServicesForQueueJob(j *arbv1.XQueueJob) ([]*v1.Service, error) {
-	servicelist, err := qjrService.clients.CoreV1().Services(j.Namespace).List(metav1.ListOptions{})
+
+func (qjrService *QueueJobResService) getServiceForQueueJobRes(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) (*string, *v1.Service, []*v1.Service, error) {
+
+	// Get "a" Service from XQJ Resource
+	serviceInQjr, err := qjrService.getServiceTemplate(qjobRes)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+		return nil, nil, nil, err
 	}
 
-	services := []*v1.Service{}
-	for i, service := range servicelist.Items {
-		metaService, err := meta.Accessor(&service)
-		if err != nil {
-			return nil, err
-		}
-
-		controllerRef := metav1.GetControllerOf(metaService)
-		if controllerRef != nil {
-			if controllerRef.UID == j.UID {
-				services = append(services, &servicelist.Items[i])
-			}
-		}
+	// Get Service"s" in Etcd Server
+	var _namespace *string
+	if serviceInQjr.Namespace!=""{
+		_namespace = &serviceInQjr.Namespace
+	} else {
+		_namespace = &queuejob.Namespace
 	}
-	return services, nil
-
-}
-
-func (qjrService *QueueJobResService) getServicesForQueueJobRes(qjobRes *arbv1.XQueueJobResource, j *arbv1.XQueueJob) ([]*v1.Service, error) {
-
-	services, err := qjrService.getServicesForQueueJob(j)
+	serviceList, err := qjrService.clients.CoreV1().Services(*_namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, queuejob.Name),})
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
+	}
+	servicesInEtcd := []*v1.Service{}
+	for i, _ := range serviceList.Items {
+				servicesInEtcd = append(servicesInEtcd, &serviceList.Items[i])
 	}
 
-	myServices := []*v1.Service{}
-	for i, service := range services {
+	// for i, service := range serviceList.Items {
+	// 	metaService, err := meta.Accessor(&service)
+	// 	if err != nil {
+	// 		return nil, nil, nil, err
+	// 	}
+	// 	controllerRef := metav1.GetControllerOf(metaService)
+	// 	if controllerRef != nil {
+	// 		if controllerRef.UID == queuejob.UID {
+	// 			servicesInEtcd = append(servicesInEtcd, &serviceList.Items[i])
+	// 		}
+	// 	}
+	// }
+	myServicesInEtcd := []*v1.Service{}
+	for i, service := range servicesInEtcd {
 		if qjrService.refManager.BelongTo(qjobRes, service) {
-			myServices = append(myServices, services[i])
+			myServicesInEtcd = append(myServicesInEtcd, servicesInEtcd[i])
 		}
 	}
 
-	return myServices, nil
-
+	return _namespace, serviceInQjr, myServicesInEtcd, nil
 }
+
 
 func (qjrService *QueueJobResService) deleteQueueJobResServices(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
 
 	job := *queuejob
 
-	activeServices, err := qjrService.getServicesForQueueJobRes(qjobRes, queuejob)
+	_namespace, _, activeServices, err := qjrService.getServiceForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
@@ -301,9 +308,9 @@ func (qjrService *QueueJobResService) deleteQueueJobResServices(qjobRes *arbv1.X
 	for i := int32(0); i < active; i++ {
 		go func(ix int32) {
 			defer wait.Done()
-			if err := qjrService.delService(queuejob.Namespace, activeServices[ix].Name); err != nil {
+			if err := qjrService.delService(*_namespace, activeServices[ix].Name); err != nil {
 				defer utilruntime.HandleError(err)
-				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeServices[ix].Name, job.Namespace, job.Name)
+				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeServices[ix].Name, *_namespace, job.Name)
 			}
 		}(i)
 	}
@@ -316,3 +323,145 @@ func (qjrService *QueueJobResService) deleteQueueJobResServices(qjobRes *arbv1.X
 func (qjrService *QueueJobResService) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
 	return qjrService.deleteQueueJobResServices(qjobRes, queuejob)
 }
+
+
+// //SyncQueueJob syncs the services
+// func (qjrService *QueueJobResService) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+//
+// 	startTime := time.Now()
+// 	defer func() {
+// 		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
+// 		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+// 	}()
+//
+// 	services, err := qjrService.getServicesForQueueJobRes(qjobRes, queuejob)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	serviceLen := len(services)
+// 	replicas := qjobRes.Replicas
+//
+// 	diff := int(replicas) - int(serviceLen)
+//
+// 	glog.V(4).Infof("QJob: %s had %d services and %d desired services", queuejob.Name, replicas, serviceLen)
+//
+// 	if diff > 0 {
+// 		template, err := qjrService.getServiceTemplate(qjobRes)
+// 		if err != nil {
+// 			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+// 			return err
+// 		}
+// 		//TODO: need set reference after Service has been really added
+// 		tmpService := v1.Service{}
+// 		err = qjrService.refManager.AddReference(qjobRes, &tmpService)
+// 		if err != nil {
+// 			glog.Errorf("Cannot add reference to service resource %+v", err)
+// 			return err
+// 		}
+//
+// 		if template.Labels == nil {
+// 			template.Labels = map[string]string{}
+// 		}
+// 		for k, v := range tmpService.Labels {
+// 			template.Labels[k] = v
+// 		}
+// 		wait := sync.WaitGroup{}
+// 		wait.Add(int(diff))
+// 		for i := 0; i < diff; i++ {
+// 			go func() {
+// 				defer wait.Done()
+// 				_namespace:=""
+// 				if template.Namespace!=""{
+// 					_namespace=template.Namespace
+// 				} else {
+// 					_namespace=queuejob.Namespace
+// 				}
+// 				err := qjrService.createServiceWithControllerRef(_namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+// 				if err != nil && errors.IsTimeout(err) {
+// 					return
+// 				}
+// 				if err != nil {
+// 					defer utilruntime.HandleError(err)
+// 				}
+// 			}()
+// 		}
+// 		wait.Wait()
+// 	}
+//
+// 	return nil
+// }
+//
+// func (qjrService *QueueJobResService) getServicesForQueueJob(j *arbv1.XQueueJob) ([]*v1.Service, error) {
+// 	servicelist, err := qjrService.clients.CoreV1().Services(j.Namespace).List(metav1.ListOptions{})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	services := []*v1.Service{}
+// 	for i, service := range servicelist.Items {
+// 		metaService, err := meta.Accessor(&service)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+//
+// 		controllerRef := metav1.GetControllerOf(metaService)
+// 		if controllerRef != nil {
+// 			if controllerRef.UID == j.UID {
+// 				services = append(services, &servicelist.Items[i])
+// 			}
+// 		}
+// 	}
+// 	return services, nil
+//
+// }
+//
+// func (qjrService *QueueJobResService) getServicesForQueueJobRes(qjobRes *arbv1.XQueueJobResource, j *arbv1.XQueueJob) ([]*v1.Service, error) {
+//
+// 	services, err := qjrService.getServicesForQueueJob(j)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	myServices := []*v1.Service{}
+// 	for i, service := range services {
+// 		if qjrService.refManager.BelongTo(qjobRes, service) {
+// 			myServices = append(myServices, services[i])
+// 		}
+// 	}
+//
+// 	return myServices, nil
+//
+// }
+//
+// func (qjrService *QueueJobResService) deleteQueueJobResServices(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
+//
+// 	job := *queuejob
+//
+// 	activeServices, err := qjrService.getServicesForQueueJobRes(qjobRes, queuejob)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	active := int32(len(activeServices))
+//
+// 	wait := sync.WaitGroup{}
+// 	wait.Add(int(active))
+// 	for i := int32(0); i < active; i++ {
+// 		go func(ix int32) {
+// 			defer wait.Done()
+// 			if err := qjrService.delService(queuejob.Namespace, activeServices[ix].Name); err != nil {
+// 				defer utilruntime.HandleError(err)
+// 				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeServices[ix].Name, job.Namespace, job.Name)
+// 			}
+// 		}(i)
+// 	}
+// 	wait.Wait()
+//
+// 	return nil
+// }
+//
+// //Cleanup deletes all services
+// func (qjrService *QueueJobResService) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+// 	return qjrService.deleteQueueJobResServices(qjobRes, queuejob)
+// }

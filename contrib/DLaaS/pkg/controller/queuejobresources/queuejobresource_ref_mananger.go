@@ -21,6 +21,7 @@ import (
 	qjobv1 "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/apis/controller/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	// "github.com/golang/glog"
 )
 
 //RefManager : Define reference manager commont interface
@@ -81,8 +82,9 @@ func (rm *RefByLabel) BelongTo(owner *qjobv1.XQueueJobResource, ownee runtime.Ob
 	labels := accessor.GetLabels()
 	labelsOwner := accessorOwner.GetLabels()
 
-	return labels != nil && labelsOwner != nil && labels[rm.qjobResLabel] == labelsOwner[rm.qjobResLabel]
+	// glog.Infof("Compare: %s, %s\n", labels[rm.qjobResLabel], labelsOwner[rm.qjobResLabel])
 
+	return labels != nil && labelsOwner != nil && labels[rm.qjobResLabel] == labelsOwner[rm.qjobResLabel]
 }
 
 //AddReference : add ref

@@ -22,7 +22,7 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +110,7 @@ func (qjrConfigMap *QueueJobResConfigMap) Run(stopCh <-chan struct{}) {
 	qjrConfigMap.configmapInformer.Informer().Run(stopCh)
 }
 
-func (qjrPod *QueueJobResConfigMap) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrConfigMap *QueueJobResConfigMap) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
 	return schedulerapi.EmptyResource()
 }
 
@@ -130,7 +130,7 @@ func (qjrConfigMap *QueueJobResConfigMap) deleteConfigMap(obj interface{}) {
 }
 
 
-func (qjrPod *QueueJobResConfigMap) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrConfigMap *QueueJobResConfigMap) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         return total
 }
@@ -156,8 +156,6 @@ func (qjrConfigMap *QueueJobResConfigMap) getConfigMapTemplate(qjobRes *arbv1.XQ
 }
 
 func (qjrConfigMap *QueueJobResConfigMap) createConfigMapWithControllerRef(namespace string, configmap *v1.ConfigMap, controllerRef *metav1.OwnerReference) error {
-
-	glog.V(4).Infof("==========create ConfigMap: %+v \n", configmap)
 	if controllerRef != nil {
 		configmap.OwnerReferences = append(configmap.OwnerReferences, *controllerRef)
 	}
@@ -170,8 +168,6 @@ func (qjrConfigMap *QueueJobResConfigMap) createConfigMapWithControllerRef(names
 }
 
 func (qjrConfigMap *QueueJobResConfigMap) delConfigMap(namespace string, name string) error {
-
-	glog.V(4).Infof("==========delete configmap: %s \n", name)
 	if err := qjrConfigMap.clients.Core().ConfigMaps(namespace).Delete(name, nil); err != nil {
 		return err
 	}
@@ -179,36 +175,32 @@ func (qjrConfigMap *QueueJobResConfigMap) delConfigMap(namespace string, name st
 	return nil
 }
 
-func (qjrPod *QueueJobResConfigMap) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrConfigMap *QueueJobResConfigMap) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
-//SyncQueueJob syncs the services
 func (qjrConfigMap *QueueJobResConfigMap) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
 
 	startTime := time.Now()
+
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
 	}()
 
-	configmaps, err := qjrConfigMap.getConfigMapForQueueJobRes(qjobRes, queuejob)
+	_namespace, configMapInQjr, configMapsInEtcd, err := qjrConfigMap.getConfigMapForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
 
-	configmapLen := len(configmaps)
+	configMapLen := len(configMapsInEtcd)
 	replicas := qjobRes.Replicas
 
-	diff := int(replicas) - int(configmapLen)
+	diff := int(replicas) - int(configMapLen)
 
-	glog.V(4).Infof("QJob: %s had %d configmaps and %d desired configmaps", queuejob.Name, replicas, configmapLen)
+	glog.V(4).Infof("QJob: %s had %d configMaps and %d desired configMaps", queuejob.Name, configMapLen, replicas)
 
 	if diff > 0 {
-		template, err := qjrConfigMap.getConfigMapTemplate(qjobRes)
-		if err != nil {
-			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
-			return err
-		}
 		//TODO: need set reference after Service has been really added
 		tmpConfigMap := v1.ConfigMap{}
 		err = qjrConfigMap.refManager.AddReference(qjobRes, &tmpConfigMap)
@@ -216,19 +208,22 @@ func (qjrConfigMap *QueueJobResConfigMap) SyncQueueJob(queuejob *arbv1.XQueueJob
 			glog.Errorf("Cannot add reference to configmap resource %+v", err)
 			return err
 		}
-
-		if template.Labels == nil {
-			template.Labels = map[string]string{}
+		if configMapInQjr.Labels == nil {
+			configMapInQjr.Labels = map[string]string{}
 		}
 		for k, v := range tmpConfigMap.Labels {
-			template.Labels[k] = v
+			configMapInQjr.Labels[k] = v
 		}
+		configMapInQjr.Labels[queueJobName] = queuejob.Name
+
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				err := qjrConfigMap.createConfigMapWithControllerRef(queuejob.Namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+
+				err := qjrConfigMap.createConfigMapWithControllerRef(*_namespace, configMapInQjr, metav1.NewControllerRef(queuejob, queueJobKind))
+
 				if err != nil && errors.IsTimeout(err) {
 					return
 				}
@@ -243,53 +238,64 @@ func (qjrConfigMap *QueueJobResConfigMap) SyncQueueJob(queuejob *arbv1.XQueueJob
 	return nil
 }
 
-func (qjrConfigMap *QueueJobResConfigMap) getConfigMapForQueueJob(j *arbv1.XQueueJob) ([]*v1.ConfigMap, error) {
-	configmaplist, err := qjrConfigMap.clients.CoreV1().ConfigMaps(j.Namespace).List(metav1.ListOptions{})
+
+func (qjrConfigMap *QueueJobResConfigMap) getConfigMapForQueueJobRes(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) (*string, *v1.ConfigMap, []*v1.ConfigMap, error) {
+
+	// Get "a" ConfigMap from XQJ Resource
+	configMapInQjr, err := qjrConfigMap.getConfigMapTemplate(qjobRes)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+		return nil, nil, nil, err
 	}
 
-	configmaps := []*v1.ConfigMap{}
-	for i, configmap := range configmaplist.Items {
-		metaConfigMap, err := meta.Accessor(&configmap)
-		if err != nil {
-			return nil, err
-		}
+	// Get ConfigMap"s" in Etcd Server
+	var _namespace *string
+	if configMapInQjr.Namespace!=""{
+		_namespace = &configMapInQjr.Namespace
+	} else {
+		_namespace = &queuejob.Namespace
+	}
+	configMapList, err := qjrConfigMap.clients.CoreV1().ConfigMaps(*_namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, queuejob.Name),})
+	// configMapList, err := qjrConfigMap.clients.CoreV1().ConfigMaps(*_namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
-		controllerRef := metav1.GetControllerOf(metaConfigMap)
-		if controllerRef != nil {
-			if controllerRef.UID == j.UID {
-				configmaps = append(configmaps, &configmaplist.Items[i])
-			}
+	configMapsInEtcd := []*v1.ConfigMap{}
+	for i, _ := range configMapList.Items {
+				configMapsInEtcd = append(configMapsInEtcd, &configMapList.Items[i])
+	}
+	//
+	//
+	// for i, configMap := range configMapList.Items {
+	// 	metaConfigMap, err := meta.Accessor(&configMap)
+	// 	if err != nil {
+	// 		return nil, nil, nil, err
+	// 	}
+	// 	controllerRef := metav1.GetControllerOf(metaConfigMap)
+	// 	if controllerRef != nil {
+	// 		if controllerRef.UID == queuejob.UID {
+	// 			configMapsInEtcd = append(configMapsInEtcd, &configMapList.Items[i])
+	// 		}
+	// 	}
+	// }
+	myConfigMapsInEtcd := []*v1.ConfigMap{}
+	for i, configMap := range configMapsInEtcd {
+		glog.Infof("[Tonghoon] ConfigMap Name: %s\n", configMap.Name)
+		if qjrConfigMap.refManager.BelongTo(qjobRes, configMap) {
+			myConfigMapsInEtcd = append(myConfigMapsInEtcd, configMapsInEtcd[i])
 		}
 	}
-	return configmaps, nil
 
+	return _namespace, configMapInQjr, myConfigMapsInEtcd, nil
 }
 
-func (qjrConfigMap *QueueJobResConfigMap) getConfigMapForQueueJobRes(qjobRes *arbv1.XQueueJobResource, j *arbv1.XQueueJob) ([]*v1.ConfigMap, error) {
-
-	configmaps, err := qjrConfigMap.getConfigMapForQueueJob(j)
-	if err != nil {
-		return nil, err
-	}
-
-	myConfigMaps := []*v1.ConfigMap{}
-	for i, configmap := range configmaps {
-		if qjrConfigMap.refManager.BelongTo(qjobRes, configmap) {
-			myConfigMaps = append(myConfigMaps, configmaps[i])
-		}
-	}
-
-	return myConfigMaps, nil
-
-}
 
 func (qjrConfigMap *QueueJobResConfigMap) deleteQueueJobResConfigMaps(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
 
 	job := *queuejob
 
-	activeConfigMaps, err := qjrConfigMap.getConfigMapForQueueJobRes(qjobRes, queuejob)
+	_namespace, _, activeConfigMaps, err := qjrConfigMap.getConfigMapForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
@@ -301,9 +307,9 @@ func (qjrConfigMap *QueueJobResConfigMap) deleteQueueJobResConfigMaps(qjobRes *a
 	for i := int32(0); i < active; i++ {
 		go func(ix int32) {
 			defer wait.Done()
-			if err := qjrConfigMap.delConfigMap(queuejob.Namespace, activeConfigMaps[ix].Name); err != nil {
+			if err := qjrConfigMap.delConfigMap(*_namespace, activeConfigMaps[ix].Name); err != nil {
 				defer utilruntime.HandleError(err)
-				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeConfigMaps[ix].Name, job.Namespace, job.Name)
+				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeConfigMaps[ix].Name, *_namespace, job.Name)
 			}
 		}(i)
 	}

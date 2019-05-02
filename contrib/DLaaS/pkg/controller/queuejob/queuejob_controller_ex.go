@@ -191,13 +191,10 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 		cache:		  schedulercache.New(config, schedulerName),
 	}
 
-	queueJobClient, _, err := clients.NewClient(cc.config)
-	if err != nil {
-		panic(err)
-	}
+
+
 	cc.qjobResControls = map[arbv1.ResourceType]queuejobresources.Interface{}
 	RegisterAllQueueJobResourceTypes(&cc.qjobRegisteredResources)
-
 	//initialize pod sub-resource control
 	resControlPod, found, err := cc.qjobRegisteredResources.InitQueueJobResource(arbv1.ResourceTypePod, config)
 	if err != nil {
@@ -315,6 +312,10 @@ func NewXQueueJobController(config *rest.Config, schedulerName string, isDispatc
 	}
 	cc.qjobResControls[arbv1.ResourceTypeStatefulSet] = resControlSS
 
+	queueJobClient, _, err := clients.NewClient(cc.config)
+	if err != nil {
+		panic(err)
+	}
 	cc.queueJobInformer = arbinformers.NewSharedInformerFactory(queueJobClient, 0).XQueueJob().XQueueJobs()
 	cc.queueJobInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
@@ -398,17 +399,22 @@ func (qjm *XController) GetQueueJobsEligibleForPreemption() []*arbv1.XQueueJob {
 			replicas := value.Spec.SchedSpec.MinAvailable
 
 			if int(value.Status.Succeeded) == replicas {
+				if (replicas>0) {
 				// glog.Infof("[Tonghoon] XQueueJob %s deleted from API\n", value.Name)
-				qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{
-				})
-				continue
+					qjm.arbclients.ArbV1().XQueueJobs(value.Namespace).Delete(value.Name, &metav1.DeleteOptions{})
+					continue
+				}
 			}
 			if value.Status.State == arbv1.QueueJobStateEnqueued {
 				continue
 			}
-			glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
+
 			if int(value.Status.Running) < replicas {
-				qjobs = append(qjobs, value)
+				if (replicas>0) {
+					// glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value, value.Status.Running, replicas, value.Status.Succeeded)
+					glog.Infof("I have job %s eligible for preemption %v - %v , %v !!! \n", value.Name, value.Status.Running, replicas, value.Status.Succeeded)
+					qjobs = append(qjobs, value)
+				}
 			}
 		}
 	}
@@ -638,7 +644,10 @@ func (cc *XController) Run(stopCh chan struct{}) {
 	go wait.Until(cc.UpdateQueueJobs, 2*time.Second, stopCh)
 
 	if cc.isDispatcher {
-		go wait.Until(cc.UpdateAgent, 2*time.Second, stopCh)
+		go wait.Until(cc.UpdateAgent, 2*time.Second, stopCh)			// In the Agent?
+		for _, xqueueAgent:= range cc.agentMap {
+			go xqueueAgent.Run(stopCh)
+		}
 	}
 
 	go wait.Until(cc.worker, time.Second, stopCh)
@@ -846,9 +855,9 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			return nil
 		}
 
-		if qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateActive {
+		// if qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateActive {
 			// glog.V(2).Infof("[===Tonghoon===] XQJ %s is in Active\n", qj.Name)
-		}
+		// }
 
 		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
 			qj.Status.State =  arbv1.QueueJobStateActive
@@ -923,14 +932,15 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 			return nil
 		}
 
+		// if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
 		if !qj.Status.CanRun && qj.Status.State == arbv1.QueueJobStateEnqueued {
 			// glog.Infof("[Tonghoon] Dispatcher Mode: Putting job in queue!")
 			cc.qjqueue.AddIfNotPresent(qj)
 			return nil
 		}
 
-		if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
-			qj.Status.State =  arbv1.QueueJobStateActive
+		if qj.Status.CanRun && !qj.Status.IsDispatched{
+			qj.Status.IsDispatched = true
 			queuejobKey, _:=GetQueueJobKey(qj)
 			// obj:=cc.dispatchMap[queuejobKey]
 			// if obj!=nil {
@@ -938,6 +948,17 @@ func (cc *XController) manageQueueJob(qj *arbv1.XQueueJob) error {
 				cc.agentMap[obj].CreateXQueueJob(qj)
 			}
 		}
+
+		// if qj.Status.CanRun && qj.Status.State != arbv1.QueueJobStateActive {
+		// 	qj.Status.State =  arbv1.QueueJobStateActive
+		// 	queuejobKey, _:=GetQueueJobKey(qj)
+		// 	// obj:=cc.dispatchMap[queuejobKey]
+		// 	// if obj!=nil {
+		// 	if obj, ok:=cc.dispatchMap[queuejobKey]; ok {
+		// 		cc.agentMap[obj].CreateXQueueJob(qj)
+		// 	}
+		// }
+
 
 		// if qj.Spec.AggrResources.Items != nil {
 		// 	for i := range qj.Spec.AggrResources.Items {

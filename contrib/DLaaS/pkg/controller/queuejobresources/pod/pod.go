@@ -197,6 +197,7 @@ func (qjrPod *QueueJobResPod) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *a
 	//if ok && counter >= 0 {
 	//	return fmt.Errorf("There are still terminating pods for QueueJob %s/%s, can not sync it now", queuejob.Namespace, queuejob.Name)
 	//}
+	glog.Infof("[Tonghoon] GET QUEUEJOB INFO=%s========\n",queuejob.Namespace)
 
 	pods, err := qjrPod.getPodsForQueueJob(queuejob)
 	if err != nil {
@@ -209,39 +210,39 @@ func (qjrPod *QueueJobResPod) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *a
 }
 
 func (qjrPod *QueueJobResPod) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+
 	sel := &metav1.LabelSelector{
-                MatchLabels: map[string]string{
-                        queueJobName: queuejob.Name,
-                },
-        }
-        selector, err := metav1.LabelSelectorAsSelector(sel)
-        if err != nil {
-                return fmt.Errorf("couldn't convert QueueJob selector: %v", err)
-        }
-        // List all pods under QueueJob
-        pods, errt := qjrPod.podStore.Pods(queuejob.Namespace).List(selector)
-        if errt != nil {
-                return  errt
-        }
+		MatchLabels: map[string]string{
+			queueJobName: queuejob.Name,
+		},
+	}
+	selector, err := metav1.LabelSelectorAsSelector(sel)
+  if err != nil {
+          return fmt.Errorf("couldn't convert QueueJob selector: %v", err)
+  }
+  // List all pods under QueueJob
+  pods, errt := qjrPod.podStore.Pods(queuejob.Namespace).List(selector)
+  if errt != nil {
+          return  errt
+  }
 
 	running := int32(queuejobresources.FilterPods(pods, v1.PodRunning))
   pending := int32(queuejobresources.FilterPods(pods, v1.PodPending))
   succeeded := int32(queuejobresources.FilterPods(pods, v1.PodSucceeded))
   failed := int32(queuejobresources.FilterPods(pods, v1.PodFailed))
 
-        glog.Infof("There are %d pods of QueueJob %s:  pending %d, running %d, succeeded %d, failed %d",
-                len(pods), queuejob.Name,  pending, running, succeeded, failed)
+	log.Infof("There are %d pods of QueueJob %s:  pending %d, running %d, succeeded %d, failed %d", len(pods), queuejob.Name,  pending, running, succeeded, failed)
 
 	old_flag := queuejob.Status.CanRun
 	old_state := queuejob.Status.State
-        queuejob.Status = arbv1.XQueueJobStatus{
+	queuejob.Status = arbv1.XQueueJobStatus{
                 Pending:      pending,
                 Running:      running,
                 Succeeded:    succeeded,
                 Failed:       failed,
                 MinAvailable: int32(queuejob.Spec.SchedSpec.MinAvailable),
-        }
-        queuejob.Status.CanRun = old_flag
+							}
+  queuejob.Status.CanRun = old_flag
 	queuejob.Status.State = old_state
 
 	return nil

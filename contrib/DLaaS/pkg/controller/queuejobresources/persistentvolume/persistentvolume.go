@@ -22,7 +22,7 @@ import (
 	schedulerapi "github.com/kubernetes-sigs/kube-batch/contrib/DLaaS/pkg/scheduler/api"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +110,7 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) Run(stopCh <-chan struct
 	qjrPersistentvolume.persistentvolumeInformer.Informer().Run(stopCh)
 }
 
-func (qjrPod *QueueJobResPersistentvolume) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrPersistentvolume *QueueJobResPersistentvolume) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
 	return schedulerapi.EmptyResource()
 }
 
@@ -130,7 +130,7 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) deletePersistentVolume(o
 }
 
 
-func (qjrPod *QueueJobResPersistentvolume) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrPersistentvolume *QueueJobResPersistentvolume) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         return total
 }
@@ -157,7 +157,7 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) getPersistentVolumeTempl
 
 func (qjrPersistentvolume *QueueJobResPersistentvolume) createPersistentVolumeWithControllerRef(persistentvolume *v1.PersistentVolume, controllerRef *metav1.OwnerReference) error {
 
-	glog.V(4).Infof("==========create PersistentVolume: %+v \n", persistentvolume)
+	// glog.V(4).Infof("==========create PersistentVolume: %+v \n", persistentvolume)
 	if controllerRef != nil {
 		persistentvolume.OwnerReferences = append(persistentvolume.OwnerReferences, *controllerRef)
 	}
@@ -179,7 +179,7 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) delPersistentVolume(name
 	return nil
 }
 
-func (qjrPod *QueueJobResPersistentvolume) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrPersistentvolume *QueueJobResPersistentvolume) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
@@ -188,7 +188,8 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) SyncQueueJob(queuejob *a
 
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
 	}()
 
 	persistentvolumes, err := qjrPersistentvolume.getPersistentVolumeForQueueJobRes(qjobRes, queuejob)
@@ -201,7 +202,7 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) SyncQueueJob(queuejob *a
 
 	diff := int(replicas) - int(persistentvolumeLen)
 
-	glog.V(4).Infof("QJob: %s had %d persistentvolumes and %d desired persistentvolumes", queuejob.Name, replicas, persistentvolumeLen)
+	glog.V(4).Infof("QJob: %s had %d persistentvolumes and %d desired persistentvolumes", queuejob.Name, persistentvolumeLen, replicas)
 
 	if diff > 0 {
 		template, err := qjrPersistentvolume.getPersistentVolumeTemplate(qjobRes)
@@ -223,6 +224,8 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) SyncQueueJob(queuejob *a
 		for k, v := range tmpPersistentVolume.Labels {
 			template.Labels[k] = v
 		}
+		template.Labels[queueJobName] = queuejob.Name
+
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
@@ -244,25 +247,29 @@ func (qjrPersistentvolume *QueueJobResPersistentvolume) SyncQueueJob(queuejob *a
 }
 
 func (qjrPersistentvolume *QueueJobResPersistentvolume) getPersistentVolumeForQueueJob(j *arbv1.XQueueJob) ([]*v1.PersistentVolume, error) {
-	persistentvolumelist, err := qjrPersistentvolume.clients.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	persistentvolumelist, err := qjrPersistentvolume.clients.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, j.Name),})
 	if err != nil {
 		return nil, err
 	}
 
 	persistentvolumes := []*v1.PersistentVolume{}
-	for i, persistentvolume := range persistentvolumelist.Items {
-		metaPersistentVolume, err := meta.Accessor(&persistentvolume)
-		if err != nil {
-			return nil, err
-		}
-
-		controllerRef := metav1.GetControllerOf(metaPersistentVolume)
-		if controllerRef != nil {
-			if controllerRef.UID == j.UID {
+	for i, _ := range persistentvolumelist.Items {
 				persistentvolumes = append(persistentvolumes, &persistentvolumelist.Items[i])
-			}
-		}
 	}
+
+	// for i, persistentvolume := range persistentvolumelist.Items {
+	// 	metaPersistentVolume, err := meta.Accessor(&persistentvolume)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	//
+	// 	controllerRef := metav1.GetControllerOf(metaPersistentVolume)
+	// 	if controllerRef != nil {
+	// 		if controllerRef.UID == j.UID {
+	// 			persistentvolumes = append(persistentvolumes, &persistentvolumelist.Items[i])
+	// 		}
+	// 	}
+	// }
 	return persistentvolumes, nil
 
 }

@@ -54,8 +54,8 @@ const (
 type QueueJobResDeployment struct {
 	clients    *kubernetes.Clientset
 	arbclients *clientset.Clientset
-	// A store of services, populated by the serviceController
-	serviceStore   extlister.DeploymentLister
+	// A store of deployments, populated by the deploymentController
+	deploymentStore   extlister.DeploymentLister
 	deployInformer extinformer.DeploymentInformer
 	rtScheme       *runtime.Scheme
 	jsonSerializer *json.Serializer
@@ -72,68 +72,68 @@ func Register(regs *queuejobresources.RegisteredResources) {
 
 //NewQueueJobResDeployment returns a new deployment controller
 func NewQueueJobResDeployment(config *rest.Config) queuejobresources.Interface {
-	qjrd := &QueueJobResDeployment{
+	qjrDeployment := &QueueJobResDeployment{
 		clients:    kubernetes.NewForConfigOrDie(config),
 		arbclients: clientset.NewForConfigOrDie(config),
 	}
 
-	qjrd.deployInformer = informers.NewSharedInformerFactory(qjrd.clients, 0).Apps().V1beta1().Deployments()
-	qjrd.deployInformer.Informer().AddEventHandler(
+	qjrDeployment.deployInformer = informers.NewSharedInformerFactory(qjrDeployment.clients, 0).Apps().V1beta1().Deployments()
+	qjrDeployment.deployInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch obj.(type) {
-				case *v1beta1.Deployment:
+				case *apps.Deployment:
 					return true
 				default:
 					return false
 				}
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    qjrd.addDeployment,
-				UpdateFunc: qjrd.updateDeployment,
-				DeleteFunc: qjrd.deleteDeployment,
+				AddFunc:    qjrDeployment.addDeployment,
+				UpdateFunc: qjrDeployment.updateDeployment,
+				DeleteFunc: qjrDeployment.deleteDeployment,
 			},
 		})
 
-	qjrd.rtScheme = runtime.NewScheme()
-	v1.AddToScheme(qjrd.rtScheme)
-	v1beta1.AddToScheme(qjrd.rtScheme)
-	apps.AddToScheme(qjrd.rtScheme)
-	qjrd.jsonSerializer = json.NewYAMLSerializer(json.DefaultMetaFactory, qjrd.rtScheme, qjrd.rtScheme)
+	qjrDeployment.rtScheme = runtime.NewScheme()
+	v1.AddToScheme(qjrDeployment.rtScheme)
+	v1beta1.AddToScheme(qjrDeployment.rtScheme)
+	apps.AddToScheme(qjrDeployment.rtScheme)
+	qjrDeployment.jsonSerializer = json.NewYAMLSerializer(json.DefaultMetaFactory, qjrDeployment.rtScheme, qjrDeployment.rtScheme)
 
-	qjrd.refManager = queuejobresources.NewLabelRefManager()
+	qjrDeployment.refManager = queuejobresources.NewLabelRefManager()
 
-	return qjrd
+	return qjrDeployment
 }
 
 
-func (qjrPod *QueueJobResDeployment) GetPodTemplate(qjobRes *arbv1.XQueueJobResource) (*v1.PodTemplateSpec, int32, error) {
-        res, err := qjrPod.getDeploymentTemplate(qjobRes)
-        if err != nil {
-                return nil, -1, err
-        }
-        return &res.Spec.Template, *res.Spec.Replicas, nil
+func (qjrDeployment *QueueJobResDeployment) GetPodTemplate(qjobRes *arbv1.XQueueJobResource) (*v1.PodTemplateSpec, int32, error) {
+	res, err := qjrDeployment.getDeploymentTemplate(qjobRes)
+	if err != nil {
+	        return nil, -1, err
+	}
+	return &res.Spec.Template, *res.Spec.Replicas, nil
 }
 
-func (qjrPod *QueueJobResDeployment) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
-        total := schedulerapi.EmptyResource()
-        if job.Spec.AggrResources.Items != nil {
-            //calculate scaling
-            for _, ar := range job.Spec.AggrResources.Items {
-                if ar.Type == arbv1.ResourceTypeDeployment {
-                        template, replicas, _ := qjrPod.GetPodTemplate(&ar)
-                        myres := queuejobresources.GetPodResources(template)
-                        myres.MilliCPU = float64(replicas) * myres.MilliCPU
-                        myres.Memory = float64(replicas) * myres.Memory
-                        myres.GPU = int64(replicas) * myres.GPU
-                        total = total.Add(myres)
-                }
-            }
-        }
-        return total
+func (qjrDeployment *QueueJobResDeployment) GetAggregatedResources(job *arbv1.XQueueJob) *schedulerapi.Resource {
+	total := schedulerapi.EmptyResource()
+	if job.Spec.AggrResources.Items != nil {
+	    //calculate scaling
+	    for _, ar := range job.Spec.AggrResources.Items {
+	        if ar.Type == arbv1.ResourceTypeDeployment {
+	                template, replicas, _ := qjrDeployment.GetPodTemplate(&ar)
+	                myres := queuejobresources.GetPodResources(template)
+	                myres.MilliCPU = float64(replicas) * myres.MilliCPU
+	                myres.Memory = float64(replicas) * myres.Memory
+	                myres.GPU = int64(replicas) * myres.GPU
+	                total = total.Add(myres)
+	        }
+	    }
+	}
+	return total
 }
 
-func (qjrPod *QueueJobResDeployment) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
+func (qjrDeployment *QueueJobResDeployment) GetAggregatedResourcesByPriority(priority int, job *arbv1.XQueueJob) *schedulerapi.Resource {
         total := schedulerapi.EmptyResource()
         if job.Spec.AggrResources.Items != nil {
             //calculate scaling
@@ -142,7 +142,7 @@ func (qjrPod *QueueJobResDeployment) GetAggregatedResourcesByPriority(priority i
                         continue
                   }
                   if ar.Type == arbv1.ResourceTypeDeployment {
-                        template, replicas, _ := qjrPod.GetPodTemplate(&ar)
+                        template, replicas, _ := qjrDeployment.GetPodTemplate(&ar)
                         myres := queuejobresources.GetPodResources(template)
                         myres.MilliCPU = float64(replicas) * myres.MilliCPU
                         myres.Memory = float64(replicas) * myres.Memory
@@ -155,123 +155,117 @@ func (qjrPod *QueueJobResDeployment) GetAggregatedResourcesByPriority(priority i
 }
 
 
-//Run the main goroutine responsible for watching and services.
-func (qjrService *QueueJobResDeployment) Run(stopCh <-chan struct{}) {
+//Run the main goroutine responsible for watching and deployments.
+func (qjrDeployment *QueueJobResDeployment) Run(stopCh <-chan struct{}) {
 
-	qjrService.deployInformer.Informer().Run(stopCh)
+	qjrDeployment.deployInformer.Informer().Run(stopCh)
 }
 
-func (qjrService *QueueJobResDeployment) addDeployment(obj interface{}) {
+func (qjrDeployment *QueueJobResDeployment) addDeployment(obj interface{}) {
 
 	return
 }
 
-func (qjrService *QueueJobResDeployment) updateDeployment(old, cur interface{}) {
+func (qjrDeployment *QueueJobResDeployment) updateDeployment(old, cur interface{}) {
 
 	return
 }
 
-func (qjrService *QueueJobResDeployment) deleteDeployment(obj interface{}) {
+func (qjrDeployment *QueueJobResDeployment) deleteDeployment(obj interface{}) {
 
 	return
 }
 
 
 // Parse queue job api object to get Service template
-func (qjrService *QueueJobResDeployment) getDeploymentTemplate(qjobRes *arbv1.XQueueJobResource) (*apps.Deployment, error) {
-	serviceGVK := schema.GroupVersion{Group: apps.GroupName, Version: "v1beta1"}.WithKind("Deployment")
-	obj, _, err := qjrService.jsonSerializer.Decode(qjobRes.Template.Raw, &serviceGVK, nil)
+func (qjrDeployment *QueueJobResDeployment) getDeploymentTemplate(qjobRes *arbv1.XQueueJobResource) (*apps.Deployment, error) {
+	deploymentGVK := schema.GroupVersion{Group: apps.GroupName, Version: "v1beta1"}.WithKind("Deployment")
+	obj, _, err := qjrDeployment.jsonSerializer.Decode(qjobRes.Template.Raw, &deploymentGVK, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	service, ok := obj.(*apps.Deployment)
+	deployment, ok := obj.(*apps.Deployment)
 	if !ok {
 		return nil, fmt.Errorf("Queuejob resource not defined as a Deployment")
 	}
 
-	return service, nil
+	return deployment, nil
 
 }
 
-func (qjrService *QueueJobResDeployment) createDeploymentWithControllerRef(namespace string, service *apps.Deployment, controllerRef *metav1.OwnerReference) error {
-	glog.V(4).Infof("==========create service: %s,  %+v \n", namespace, service)
+func (qjrDeployment *QueueJobResDeployment) createDeploymentWithControllerRef(namespace string, deployment *apps.Deployment, controllerRef *metav1.OwnerReference) error {
 	if controllerRef != nil {
-		service.OwnerReferences = append(service.OwnerReferences, *controllerRef)
+		deployment.OwnerReferences = append(deployment.OwnerReferences, *controllerRef)
 	}
 
-	if _, err := qjrService.clients.AppsV1beta1().Deployments(namespace).Create(service); err != nil {
+	if _, err := qjrDeployment.clients.AppsV1beta1().Deployments(namespace).Create(deployment); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (qjrService *QueueJobResDeployment) delDeployment(namespace string, name string) error {
-
-	glog.V(4).Infof("==========delete service: %s,  %s \n", namespace, name)
-	if err := qjrService.clients.AppsV1beta1().Deployments(namespace).Delete(name, nil); err != nil {
+func (qjrDeployment *QueueJobResDeployment) delDeployment(namespace string, name string) error {
+	if err := qjrDeployment.clients.AppsV1beta1().Deployments(namespace).Delete(name, nil); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func (qjrPod *QueueJobResDeployment) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
+func (qjrDeployment *QueueJobResDeployment) UpdateQueueJobStatus(queuejob *arbv1.XQueueJob) error {
 	return nil
 }
 
-//SyncQueueJob syncs the resources of this queuejob
-func (qjrService *QueueJobResDeployment) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+func (qjrDeployment *QueueJobResDeployment) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
 
 	startTime := time.Now()
+
 	defer func() {
-		glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
 	}()
 
-	services, err := qjrService.getDeploymentsForQueueJobRes(qjobRes, queuejob)
+	_namespace, deploymentInQjr, deploymentsInEtcd, err := qjrDeployment.getDeploymentForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
 
-	serviceLen := len(services)
+	deploymentLen := len(deploymentsInEtcd)
 	replicas := qjobRes.Replicas
 
-	diff := int(replicas) - int(serviceLen)
+	diff := int(replicas) - int(deploymentLen)
 
-	glog.V(4).Infof("QJob: %s had %d services and %d desired services", queuejob.Name, replicas, serviceLen)
+	glog.V(4).Infof("QJob: %s had %d Deployments and %d desired Deployments", queuejob.Name, deploymentLen, replicas)
 
 	if diff > 0 {
-		template, err := qjrService.getDeploymentTemplate(qjobRes)
-		if err != nil {
-			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
-			return err
-		}
 		//TODO: need set reference after Service has been really added
-		tmpService := v1.Service{}
-		err = qjrService.refManager.AddReference(qjobRes, &tmpService)
+		tmpDeployment := apps.Deployment{}
+		err = qjrDeployment.refManager.AddReference(qjobRes, &tmpDeployment)
 		if err != nil {
-			glog.Errorf("Cannot add reference to service resource %+v", err)
+			glog.Errorf("Cannot add reference to configmap resource %+v", err)
 			return err
 		}
+		if deploymentInQjr.Labels == nil {
+			deploymentInQjr.Labels = map[string]string{}
+		}
+		for k, v := range tmpDeployment.Labels {
+			deploymentInQjr.Labels[k] = v
+		}
+		deploymentInQjr.Labels[queueJobName] = queuejob.Name
+    if deploymentInQjr.Spec.Template.Labels == nil {
+            deploymentInQjr.Labels = map[string]string{}
+    }
+    deploymentInQjr.Spec.Template.Labels[queueJobName] = queuejob.Name
 
-		if template.Labels == nil {
-			template.Labels = map[string]string{}
-		}
-		for k, v := range queuejob.Labels {
-			template.Labels[k] = v
-		}
-		template.Labels[queueJobName] = queuejob.Name
-		if template.Spec.Template.Labels == nil {
-			template.Labels = map[string]string{}
-		}
-		template.Spec.Template.Labels[queueJobName] = queuejob.Name
 		wait := sync.WaitGroup{}
 		wait.Add(int(diff))
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				err := qjrService.createDeploymentWithControllerRef(queuejob.Namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+
+				err := qjrDeployment.createDeploymentWithControllerRef(*_namespace, deploymentInQjr, metav1.NewControllerRef(queuejob, queueJobKind))
+
 				if err != nil && errors.IsTimeout(err) {
 					return
 				}
@@ -286,61 +280,81 @@ func (qjrService *QueueJobResDeployment) SyncQueueJob(queuejob *arbv1.XQueueJob,
 	return nil
 }
 
-func (qjrService *QueueJobResDeployment) getDeploymentsForQueueJob(j *arbv1.XQueueJob) ([]*apps.Deployment, error) {
 
-	servicelist, err := qjrService.clients.AppsV1beta1().Deployments(j.Namespace).List(metav1.ListOptions{
-                		LabelSelector: fmt.Sprintf("%s=%s", queueJobName, j.Name),
-        	})
+func (qjrDeployment *QueueJobResDeployment) getDeploymentForQueueJobRes(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) (*string, *apps.Deployment, []*apps.Deployment, error) {
+
+	// Get "a" Deployment from XQJ Resource
+	deploymentInQjr, err := qjrDeployment.getDeploymentTemplate(qjobRes)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+		return nil, nil, nil, err
 	}
 
-	services := []*apps.Deployment{}
-	for i, _ := range servicelist.Items {
-		services = append(services, &servicelist.Items[i])
+	// Get Deployment"s" in Etcd Server
+	var _namespace *string
+	if deploymentInQjr.Namespace!=""{
+		_namespace = &deploymentInQjr.Namespace
+	} else {
+		_namespace = &queuejob.Namespace
 	}
-	return services, nil
 
-}
-
-func (qjrService *QueueJobResDeployment) getDeploymentsForQueueJobRes(qjobRes *arbv1.XQueueJobResource, j *arbv1.XQueueJob) ([]*apps.Deployment, error) {
-
-	services, err := qjrService.getDeploymentsForQueueJob(j)
+	// deploymentList, err := qjrDeployment.clients.CoreV1().Deployments(*_namespace).List(metav1.ListOptions{})
+	deploymentList, err := qjrDeployment.clients.AppsV1beta1().Deployments(*_namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", queueJobName, queuejob.Name),})
+	// deploymentList, err := qjrDeployment.clients.AppsV1().Deployments(*_namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
+	}
+	deploymentsInEtcd := []*apps.Deployment{}
+	// for i, deployment := range deploymentList.Items {
+	// 	metaDeployment, err := meta.Accessor(&deployment)
+	// 	if err != nil {
+	// 		return nil, nil, nil, err
+	// 	}
+	// 	controllerRef := metav1.GetControllerOf(metaDeployment)
+	// 	if controllerRef != nil {
+	// 		if controllerRef.UID == queuejob.UID {
+	// 			deploymentsInEtcd = append(deploymentsInEtcd, &deploymentList.Items[i])
+	// 		}
+	// 	}
+	// }
+	for i, _ := range deploymentList.Items {
+				deploymentsInEtcd = append(deploymentsInEtcd, &deploymentList.Items[i])
 	}
 
-	myServices := []*apps.Deployment{}
-	for i, service := range services {
-		if qjrService.refManager.BelongTo(qjobRes, service) {
-			myServices = append(myServices, services[i])
+	// glog.Infof("[Tonghoon] Number of Deployment: %d\n", len(deploymentsInEtcd))
+
+	myDeploymentsInEtcd := []*apps.Deployment{}
+	for i, deployment := range deploymentsInEtcd {
+		// glog.Infof("[Tonghoon] Deployment Name: %s\n", deployment.Name)
+		// glog.Infof("Comapre: %s, %s\n", qjobRes, deployment)
+		if qjrDeployment.refManager.BelongTo(qjobRes, deployment) {
+			myDeploymentsInEtcd = append(myDeploymentsInEtcd, deploymentsInEtcd[i])
 		}
 	}
 
-	return myServices, nil
-
+	return _namespace, deploymentInQjr, myDeploymentsInEtcd, nil
 }
 
-func (qjrService *QueueJobResDeployment) deleteQueueJobResDeployments(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
+
+func (qjrDeployment *QueueJobResDeployment) deleteQueueJobResDeployments(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
+
 	job := *queuejob
 
-	activeServices, err := qjrService.getDeploymentsForQueueJob(queuejob)
+	_namespace, _, activeDeployments, err := qjrDeployment.getDeploymentForQueueJobRes(qjobRes, queuejob)
 	if err != nil {
 		return err
 	}
 
-	active := int32(len(activeServices))
-
-	glog.Infof("Deleting %v deployments for job %s\n", active, job.Name)
+	active := int32(len(activeDeployments))
 
 	wait := sync.WaitGroup{}
 	wait.Add(int(active))
 	for i := int32(0); i < active; i++ {
 		go func(ix int32) {
 			defer wait.Done()
-			if err := qjrService.delDeployment(queuejob.Namespace, activeServices[ix].Name); err != nil {
+			if err := qjrDeployment.delDeployment(*_namespace, activeDeployments[ix].Name); err != nil {
 				defer utilruntime.HandleError(err)
-				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeServices[ix].Name, job.Namespace, job.Name)
+				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeDeployments[ix].Name, *_namespace, job.Name)
 			}
 		}(i)
 	}
@@ -349,7 +363,163 @@ func (qjrService *QueueJobResDeployment) deleteQueueJobResDeployments(qjobRes *a
 	return nil
 }
 
-//Cleanup deletes all resources with this contorller
-func (qjrService *QueueJobResDeployment) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
-	return qjrService.deleteQueueJobResDeployments(qjobRes, queuejob)
+//Cleanup deletes all services
+func (qjrDeployment *QueueJobResDeployment) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+	return qjrDeployment.deleteQueueJobResDeployments(qjobRes, queuejob)
 }
+
+
+// func (qjrDeployment *QueueJobResDeployment) SyncQueueJob(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+//
+// 	startTime := time.Now()
+// 	defer func() {
+// 		// glog.V(4).Infof("Finished syncing queue job resource %q (%v)", qjobRes.Template, time.Now().Sub(startTime))
+// 		glog.V(4).Infof("Finished syncing queue job resource %s (%v)", queuejob.Name, time.Now().Sub(startTime))
+// 	}()
+//
+// 	deployments, err := qjrDeployment.getDeploymentsForQueueJobRes(qjobRes, queuejob)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	deploymentLen := len(deployments)
+// 	replicas := qjobRes.Replicas
+//
+// 	diff := int(replicas) - int(deploymentLen)
+//
+// 	glog.V(4).Infof("QJob: %s had %d deployments and %d desired deployments", queuejob.Name, replicas, deploymentLen)
+//
+// 	if diff > 0 {
+// 		template, err := qjrDeployment.getDeploymentTemplate(qjobRes)
+// 		if err != nil {
+// 			glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+// 			return err
+// 		}
+// 		//TODO: need set reference after Service has been really added
+// 		tmpService := v1.Service{}
+// 		err = qjrDeployment.refManager.AddReference(qjobRes, &tmpService)
+// 		if err != nil {
+// 			glog.Errorf("Cannot add reference to deployment resource %+v", err)
+// 			return err
+// 		}
+//
+// 		if template.Labels == nil {
+// 			template.Labels = map[string]string{}
+// 		}
+// 		for k, v := range queuejob.Labels {
+// 			template.Labels[k] = v
+// 		}
+// 		template.Labels[queueJobName] = queuejob.Name
+// 		if template.Spec.Template.Labels == nil {
+// 			template.Labels = map[string]string{}
+// 		}
+// 		template.Spec.Template.Labels[queueJobName] = queuejob.Name
+// 		wait := sync.WaitGroup{}
+// 		wait.Add(int(diff))
+// 		for i := 0; i < diff; i++ {
+// 			go func() {
+// 				defer wait.Done()
+// 				_namespace:=""
+// 				if template.Namespace!=""{
+// 					_namespace=template.Namespace
+// 				} else {
+// 					_namespace=queuejob.Namespace
+// 					// err = qjrConfigMap.createConfigMapWithControllerRef(.Namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+// 				}
+//
+// 				err = qjrDeployment.createDeploymentWithControllerRef(_namespace, template, metav1.NewControllerRef(queuejob, queueJobKind))
+//
+// 				if err != nil && errors.IsTimeout(err) {
+// 					return
+// 				}
+// 				if err != nil {
+// 					defer utilruntime.HandleError(err)
+// 				}
+// 			}()
+// 		}
+// 		wait.Wait()
+// 	}
+//
+// 	return nil
+// }
+//
+// func (qjrDeployment *QueueJobResDeployment) getDeploymentsForQueueJob(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) ([]*apps.Deployment, error) {
+//
+// 	template, err := qjrDeployment.getDeploymentTemplate(qjobRes)
+// 	if err != nil {
+// 		glog.Errorf("Cannot read template from resource %+v %+v", qjobRes, err)
+// 		return nil, err
+// 	}
+//
+// 	_namespace:=""
+// 	if template.Namespace!=""{
+// 		_namespace=template.Namespace
+// 	} else {
+// 		_namespace=queuejob.Namespace
+// 	}
+//
+// 	deploymentlist, err := qjrDeployment.clients.AppsV1beta1().Deployments(_namespace).List(metav1.ListOptions{
+//                 		LabelSelector: fmt.Sprintf("%s=%s", queueJobName, queuejob.Name),
+//         	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	deployments := []*apps.Deployment{}
+// 	for i, _ := range deploymentlist.Items {
+// 		deployments = append(deployments, &deploymentlist.Items[i])
+// 	}
+// 	return deployments, nil
+//
+// }
+//
+// func (qjrDeployment *QueueJobResDeployment) getDeploymentsForQueueJobRes(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) ([]*apps.Deployment, error) {
+//
+// 	deployments, err := qjrDeployment.getDeploymentsForQueueJob(qjobRes, queuejob)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	myServices := []*apps.Deployment{}
+// 	for i, deployment := range deployments {
+// 		if qjrDeployment.refManager.BelongTo(qjobRes, deployment) {
+// 			myServices = append(myServices, deployments[i])
+// 		}
+// 	}
+//
+// 	return myServices, nil
+//
+// }
+//
+// func (qjrDeployment *QueueJobResDeployment) deleteQueueJobResDeployments(qjobRes *arbv1.XQueueJobResource, queuejob *arbv1.XQueueJob) error {
+// 	job := *queuejob
+//
+// 	activeServices, err := qjrDeployment.getDeploymentsForQueueJob(qjobRes, queuejob)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	active := int32(len(activeServices))
+//
+// 	glog.Infof("Deleting %v deployments for job %s\n", active, job.Name)
+//
+// 	wait := sync.WaitGroup{}
+// 	wait.Add(int(active))
+// 	for i := int32(0); i < active; i++ {
+// 		go func(ix int32) {
+// 			defer wait.Done()
+// 			if err := qjrDeployment.delDeployment(queuejob.Namespace, activeServices[ix].Name); err != nil {
+// 				defer utilruntime.HandleError(err)
+// 				glog.V(2).Infof("Failed to delete %v, queue job %q/%q deadline exceeded", activeServices[ix].Name, job.Namespace, job.Name)
+// 			}
+// 		}(i)
+// 	}
+// 	wait.Wait()
+//
+// 	return nil
+// }
+//
+// //Cleanup deletes all resources with this contorller
+// func (qjrDeployment *QueueJobResDeployment) Cleanup(queuejob *arbv1.XQueueJob, qjobRes *arbv1.XQueueJobResource) error {
+// 	return qjrDeployment.deleteQueueJobResDeployments(qjobRes, queuejob)
+// }

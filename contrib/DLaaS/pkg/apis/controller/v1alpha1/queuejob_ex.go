@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime" 
 )
 
 const XQueueJobPlural string = "xqueuejobs"
@@ -134,6 +134,9 @@ type XQueueJobStatus struct {
 
 	//Can run?
 	CanRun bool `json:"canrun,omitempty" protobuf:"bytes,1,opt,name=canrun"`
+
+	//Is Dispatched?
+	IsDispatched bool `json:"isdispatched,omitempty" protobuf:"bytes,1,opt,name=isdispatched"`
 
 	//State - Running, Queued, Deleted ?
 	State             XQueueJobState `json:"state,omitempty"`
